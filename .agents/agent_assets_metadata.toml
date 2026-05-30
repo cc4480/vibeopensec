@@ -12,3 +12,9 @@ id = "MfMV2LbmjlXlxk1dub296"
 uri = "file://SCAN_COVERAGE.md"
 type = "text"
 title = "VibeScan — Complete Check Coverage"
+
+[[outputs]]
+id = "3Skd6UWIL4l7hnJwHWxgK"
+uri = "file://COMPETITIVE_PLAN.md"
+type = "text"
+title = "Competitive Intelligence & Winners-Circle Plan"
