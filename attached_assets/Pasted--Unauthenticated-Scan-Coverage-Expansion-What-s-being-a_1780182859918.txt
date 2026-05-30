@@ -1,0 +1,131 @@
+# Unauthenticated Scan — Coverage Expansion
+
+> What's being added to VibeScan/Seclayer's unauthenticated black-box scan, and why.
+> Goal: close the unauthenticated tier to *comprehensive* before layering authenticated scanning on top.
+> Date: May 30, 2026 · WebHorizon Laredo Digital Solutions
+
+---
+
+## Why this, why now
+
+The existing engine (97 checks) plus `vibeStackProbes` (Supabase RLS + Firebase rules) is strong on deployed-surface and on the two biggest BaaS backends. But "unauthenticated coverage" wasn't complete — several high-frequency vibe-coder failure modes were unprobed. This expansion covers the remaining angles that fit the black-box, read-only architecture, so that when authenticated scanning is added later, the unauthenticated foundation is already airtight.
+
+**Design constraints kept throughout:**
+- **Read-only.** No writes, mutations, or deletes against any target. Write exposure is *inferred* from advertised API metadata and reported at lower confidence — never by performing a write.
+- **No injection/fuzzing.** No SQLi/XSS/SSRF payloads. Those cross from observation into attack, generate false positives, and raise the legal bar. Explicitly out of scope for the unauthenticated tier.
+- **Black-box.** Every probe is an external HTTP call. No repo access, preserving the "paste a URL, no setup" wedge.
+- **Fail-soft.** A probe throwing never sinks the scan (orchestrator uses `Promise.allSettled`).
+
+---
+
+## Structure
+
+Split into focused modules under `src/probes/` rather than one growing file — each is independently testable, which matters for per-concern false-positive tuning.
+
+```
+src/probes/
+├── index.ts            # orchestrator: runs all probes in parallel, dedupes, sorts
+├── shared.ts           # common Finding type + HTTP/redaction helpers
+├── vibeStackProbes.ts  # (existing) Supabase RLS + Firebase rules — move here
+├── baasProbes.ts       # PocketBase, Appwrite, Nhost/Hasura
+├── graphqlProbe.ts     # GraphQL introspection + field suggestions
+├── apiDocsProbe.ts     # Swagger/OpenAPI/ReDoc/.well-known
+├── nextjsProbe.ts      # __NEXT_DATA__ prop leaks + source maps
+├── storageProbe.ts     # S3 / GCS / Azure Blob public listing
+├── corsProbe.ts        # exploitable reflected-origin CORS
+└── keyContextProbe.ts  # public-by-design vs sensitive key classification
+```
+
+Single entrypoint for `scanner.ts`:
+```ts
+import { runUnauthenticatedProbes } from "./probes";
+const findings = await runUnauthenticatedProbes({ jsSources, html, targetUrl });
+```
+
+---
+
+## What each module adds
+
+### 1. `baasProbes.ts` — more BaaS backends
+**Adds:** detection + read-only open-data tests for **PocketBase** (`/api/collections/{name}/records`), **Appwrite** (project-id reachability + permission guidance), and **Nhost/Hasura** (unauthenticated GraphQL introspection).
+
+**Why:** `vibeStackProbes` covers Supabase + Firebase. These three are the next most common backends vibe coders ship on, and they share the exact same failure mode — open collections/tables readable with only the public client config. Same detection-from-JS, same read-only probe model. Highest coverage-per-effort because it reuses an architecture that's already proven.
+
+### 2. `graphqlProbe.ts` — schema disclosure
+**Adds:** discovers GraphQL endpoints (from JS + common paths), tests whether **introspection is enabled in production** (full schema dump), and checks **field suggestions** ("Did you mean…" leaks).
+
+**Why:** GraphQL is common in vibe apps, and introspection-on-in-prod is a frequent default that hands an attacker the entire API surface — every type, query, mutation — in one request. One read-only POST, very high signal.
+
+### 3. `apiDocsProbe.ts` — exposed API surface
+**Adds:** checks for unprotected `/openapi.json`, `/swagger`, `/api-docs`, `/redoc`, `/graphql/schema`, and `.well-known/security.txt`.
+
+**Why:** AI-generated backends frequently ship Swagger/OpenAPI docs publicly. These leak the full API contract (endpoints, params, auth scheme) and dramatically lower the effort to attack everything else. `security.txt` is reported as Info/good-practice, not a finding.
+
+### 4. `nextjsProbe.ts` — framework-specific leaks
+**Adds:** scans the `__NEXT_DATA__` serialized-props blob for leaked secrets (Stripe secret, service_role, private keys, AWS/GitHub/Slack tokens) and checks for exposed source maps under `/_next/static`.
+
+**Why:** Next.js is one of the most common vibe-app shapes. `getServerSideProps`/`getStaticProps` misuse routinely serializes secrets into the page HTML where anyone can read them. Source maps under `/_next` expose original source. Both are Next.js-specific and missed by generic header/JS scanning.
+
+### 5. `storageProbe.ts` — public object storage
+**Adds:** detects S3, GCS, and Azure Blob references in page assets and tests each for **public listing** (read-only list request).
+
+**Why:** Extends storage coverage beyond Supabase/Firebase storage to the three major cloud providers. Publicly listable buckets are a classic data-exposure vector and easy to misconfigure with AI-scaffolded infra.
+
+### 6. `corsProbe.ts` — exploitable CORS (not just presence)
+**Adds:** sends a forged `Origin` header and tests whether the server **reflects an arbitrary origin AND allows credentials** — the genuinely exploitable case.
+
+**Why:** The existing engine flags `Access-Control-Allow-Origin: *`. But `*` without credentials is usually harmless, while *reflected arbitrary origin + `Allow-Credentials: true`* lets any website read authenticated cross-origin responses. This upgrades a noisy presence-check into an exploitability-check — fewer false positives, higher-value true positives.
+
+### 7. `keyContextProbe.ts` — noise hygiene (the "fewer alerts" pass)
+**Adds:** classifies third-party keys found in frontend JS into **public-by-design** (suppressed as Info: Stripe publishable, PostHog, GA, Firebase, Sentry DSN) vs **genuinely sensitive** (flagged: Stripe secret, SendGrid, Sentry auth token, Algolia admin, Mapbox secret).
+
+**Why:** Noise is what kills scanner trust — Aikido's whole pitch is "95% fewer alerts." Generic secret regex flags keys that are *supposed* to be in the browser, training users to ignore the tool. This module makes the engine smart about which keys matter, suppressing the false positives and flagging only real leaks. The same module stays quiet on a Stripe publishable key while flagging a Stripe secret key.
+
+---
+
+## Severity logic
+
+| Class | Severity | Notes |
+|---|---|---|
+| Secret that bypasses auth in frontend (Stripe secret, service_role, private key) | Critical | confirmed |
+| Open data store w/ sensitive-named records (users, payments…) | Critical | confirmed |
+| Open data store (empty / non-sensitive) | High | confirmed |
+| GraphQL introspection on, exposed buckets, exploitable CORS, sensitive 3rd-party key | High | confirmed |
+| Inferred write exposure (from API metadata, not tested) | Medium–High | **inferred** |
+| API docs exposed, source maps, storage listing | Medium | confirmed |
+| Field suggestions, auth-confirmation-off, wildcard+creds | Low | confirmed |
+| Detection markers, public-by-design keys, security.txt | Info | not actionable |
+
+**Confidence field:** every finding is `confirmed` (directly observed) or `inferred` (deduced from metadata, e.g. write exposure from the OpenAPI spec). Inferred findings are rated a notch lower and labeled so, so the report never overclaims.
+
+---
+
+## Integration
+
+1. Move existing `vibeStackProbes.ts` into `src/probes/`, repoint its types to `./shared`, and uncomment the two `vibeStackProbes` lines in `index.ts`.
+2. Confirm the `Finding` shape in `shared.ts` matches `scanner.ts`. If field names differ, align them in `shared.ts` only — every module imports from there.
+3. Pass the already-fetched JS bundle and landing-page HTML into `runUnauthenticatedProbes` — reuse what `jsScanner` already downloads; don't re-fetch.
+4. Merge the returned `Finding[]` into the report alongside the existing 97-check findings; results are already deduped and severity-sorted.
+
+---
+
+## Validation before shipping
+
+- **Regex tuning:** detection patterns (especially the Algolia-admin heuristic, deliberately marked `inferred`) need false-positive tuning against real bundles. Test on a sample of real targets.
+- **BaaS endpoint shapes vary:** Appwrite ids are opaque; PocketBase routing and Supabase OpenAPI response shape (`definitions` vs `paths`) differ across versions. Test against one app you own per backend.
+- **Probe caps are tunable:** 5 buckets, 25 tables, candidate GraphQL paths, 8s timeout. Adjust if too conservative/aggressive for real schemas.
+- **Ownership attestation:** active probing of a submitted URL should remain gated behind an ownership-attestation checkbox + per-target rate limit, same as the existing active checks.
+
+---
+
+## What's intentionally NOT included
+
+- **Authenticated scanning** — separate tier (Supabase bearer-token RLS-policy validation via `sub`-vs-row comparison). Builds additively on this structure; not part of the unauthenticated pass.
+- **Injection/fuzzing (SQLi/XSS/SSRF payloads)** — crosses into attack, false-positive heavy, legal bar. Out of scope by design.
+- **Write tests** — write exposure is inferred from metadata only; no INSERT/PATCH/DELETE is ever performed.
+
+---
+
+## Status
+
+All eight modules typecheck clean under `--strict` and pass a functional test with mocked responses (15 findings across 7 modules, correct severities and confidence levels, public-by-design keys correctly suppressed). Ready to wire into `scanner.ts` after the one-line `vibeStackProbes` integration step.
