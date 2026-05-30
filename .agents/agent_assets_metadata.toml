@@ -6,3 +6,9 @@ id = "APcLrv3Aokl_VpSQk6aDu"
 uri = "file://.local/vibescan-blueprint.md"
 type = "text"
 title = "VibeScan — Full Technical Blueprint"
+
+[[outputs]]
+id = "MfMV2LbmjlXlxk1dub296"
+uri = "file://SCAN_COVERAGE.md"
+type = "text"
+title = "VibeScan — Complete Check Coverage"
