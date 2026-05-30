@@ -2,6 +2,8 @@
 
 *Research date: May 30, 2026. All competitive claims below are primary-source verified.*
 
+> **Corrections from review:** (1) Aikido × Lovable launch date: the blog post is dated March 24, 2026 — the April 10 date cited in the original eval appears to be a secondary-source error. Both dates have been seen in the wild; the March 24 primary-source date is used here. (2) Bilingual target market is **EN/ES (Spanish)**, not EN/ZH — corrected throughout.
+
 ---
 
 ## Part 1 — Verified Competitive Intelligence
@@ -209,7 +211,7 @@ This is the wedge. Nobody else does this. VAS generates generic markdown. We rou
 | 1 | `vibeStackProbes.ts` — Supabase RLS + Firebase rules | ~400 lines, 1 day | Closes CVE-2025-48757 gap, matches category leader |
 | 2 | `jsScanner.ts` hygiene — anon key tuning | ~20 lines | Fewer false positives, matches Aikido "less noise" positioning |
 | 3 | Per-agent fix routing in DeepSeek report | ~100 lines + prompt work | Unique differentiator, no competitor has this |
-| 4 | Bilingual output (EN/ZH) | UI + prompt work | Opens zero-competition lane |
+| 4 | Bilingual output (EN/ES — Spanish) | UI + prompt work | Opens zero-competition lane (LatAm, US-Hispanic founders) |
 | 5 | Marketing: publish to DEV.to, submit to the roundup | Content | Gets listed; currently invisible |
 
 ---
