@@ -1,0 +1,191 @@
+# THE AI-CODE SECURITY MARKET — FULL LANDSCAPE REPORT
+
+> State of the vibe-coding / AI-generated-code security market as of late May 2026.
+> Competitors, platform moves, broader security-app launches, threat data, and what it means for Seclayer.
+> Compiled May 30, 2026 · WebHorizon Laredo Digital Solutions
+
+> **Sourcing note:** This report is built from primary-source verification (vendor sites, official docs, changelogs, Product Hunt, DEV.to hands-on tests) done May 2026. Where earlier internal research docs contained fabricated specifics (invented pricing tables, unverifiable benchmark/Elo numbers), those were discarded. Figures here are cited to real sources; anything not directly verifiable is flagged as such.
+
+---
+
+## 1. EXECUTIVE SUMMARY
+
+The market for securing AI-generated code went from niche to crowded in roughly one quarter. A March 2026 hands-on review tested **8 vibe-coding scanners** and noted the field had grown from three to eight in about a week. Since then the dynamic has shifted again: the **coding platforms themselves** (Lovable) now bundle scanning and pentesting, and the **enterprise AppSec incumbent** (Aikido, 50,000+ orgs) moved directly into the vibe-coding lane via the Lovable partnership.
+
+The result is a **three-front market**:
+1. **Indie scanners** ($0–$99/mo) competing on ease, price, and vibe-stack-specific checks.
+2. **Platform-native** security (Lovable's built-in scanner + Aikido pentesting) eating the basic scan from inside the build tool.
+3. **Enterprise AppSec** (Aikido, Snyk, GitHub, Checkmarx) reaching down into the AI-code problem from above.
+
+The basic black-box scan is **commoditizing toward free**. Differentiation has moved to: (a) closing the loop into the developer's actual agent/editor, (b) multi-layer coverage (code + config + runtime), (c) continuous protection against regression, and (d) signal quality (false-positive suppression). Price compression is real — the credible entry point for "deep" is ~$9–$19, with continuous monitoring ~$99/mo.
+
+---
+
+## 2. WHY THE MARKET EXISTS — THE THREAT DATA
+
+The demand is driven by hard, repeatedly-cited numbers (verified to named sources where possible):
+
+- **~45% of AI-generated code contains security vulnerabilities** (Veracode GenAI Code Security Report, widely cited across vendor guides).
+- **83% of Supabase database exposures involve RLS misconfiguration** (Escape.tech, cited by Vibe App Scanner).
+- **CVE-2025-48757** — the Lovable RLS vulnerability; analyses reference **~170 of 1,645 apps** (≈10.3%) with fully open Supabase tables leaking data including plaintext credentials.
+- **35 CVEs traced to AI-generated code in March 2026 alone** (Georgia Tech "Vibe Security Radar"), up sharply month-over-month.
+- **~1.5 million API keys reportedly leaked from one vibe-coded app within 3 days of launch** (cited as "Moltbook" in a DEV.to writeup — single-source, treat as illustrative).
+- **63% of vibe-coding users are not developers** (DEV.to, non-technical founder framing) — the population least able to audit what they ship.
+- **Escape.tech scanned ~5,600 vibe-coded apps** (Feb 2026) and found widespread exposure, the dataset behind much of the Lovable/Aikido urgency.
+
+The throughline: AI tools optimize for code that *runs*, not code that's *secure*, and the majority of people shipping it can't tell the difference. That's the entire market.
+
+---
+
+## 3. DIRECT COMPETITORS — INDIE VIBE-CODING SCANNERS
+
+> Pricing/features verified from vendor sites May 2026. The space moves weekly — re-verify before quoting.
+
+### Vibe App Scanner (VAS) — the category leader to beat
+- **Positioning:** the scanner built specifically for the vibe-coding workflow; understands Lovable/Bolt/Cursor/Windsurf/Replit/v0 + "20+ platforms."
+- **Approach:** URL-only, **no repo access, no setup** — turned that into a selling point.
+- **Standout checks:** actively tests **Supabase RLS** policies and **Firestore/Realtime DB** open rules; tailors checks to detected stack (Lovable, Bolt, Vercel, Render).
+- **Fixes:** exports findings as **markdown that Claude/ChatGPT can implement** (generic, not per-agent).
+- **Pricing:** **$9 Starter Scan** (headers, basic secrets, common misconfigs) · **$19 Launch Scan** (JS bundle analysis, active BaaS testing, comprehensive secret matching) · **$99/mo Continuous Protection** (daily scans, alert tracking, breach monitoring).
+- **Content moat:** an enormous SEO footprint of per-vulnerability and per-platform guides — they own the organic search for "is Supabase safe," "Lovable exposed API keys," etc.
+- **Why it leads:** narrow, stack-aware, cheap, content-dominant, owns the CVE-2025-48757 narrative.
+
+### SiteSecurityScore — the MCP-native one (watch closely)
+- **Approach:** free black-box site scan, no account; grades D→B framing; ~30-second scan.
+- **The threat to our wedge:** **MCP integration for Claude Code AND ChatGPT Codex** — "scan sites without leaving your editor," inline fixes as you code. This is the closest competitor to Seclayer's MCP wedge.
+- **Checks:** headers, TLS/HSTS, DMARC/SPF, exposed files (`.env`), CSP guidance.
+
+### Vibe Check — the open, free, "scan/fix/verify" one
+- **Positioning:** built by a self-described non-technical founder; **free, no signup for first scan, code never stored**.
+- **Approach:** AI-powered analysis emphasizing *exploitability* over pattern-matching; claims to catch things static scanners miss (found a critical command injection a competitor's SonarQube/Gitleaks/Trivy/Lighthouse stack missed).
+- **Loop:** Scan → AI tool fixes → re-scan verifies. Open source.
+
+### VibeSecurity (abenstirling) — hackathon-born, Go engine
+- 1st place, SDx Replit Vibe Coding 2025 Hackathon. Free tier + one-time premium purchase. Go-based scanner for performance. Comprehensive website checks.
+
+### VibeEval — DAST-leaning, anti-"snapshot" messaging
+- **Angle:** attacks the *timing* weakness of one-off pentests — "every Lovable regeneration can silently change RLS, remove auth, expose endpoints." Pushes continuous scanning; free scan, 14-day trial.
+- Provides the widely-cited "170+ breached Lovable databases, Feb 2026" analysis.
+
+### Others named in the field
+- **ChakraView, amihackable.dev, VibeDoctor** (uses SonarQube + Gitleaks + Trivy + Lighthouse, six tools in parallel), **Vibe Code Secure**, and an early-stage tier of minimal-feature entrants. The DEV.to roundup's conclusion: *no single scanner catches everything* — the problem has three layers (code, config, runtime) and the best practice is running a source scanner AND a live scanner.
+
+### Indie-tier takeaways for Seclayer
+- $9 is the established entry price (VAS Starter); $19 the "real" deep tier; $99/mo the continuous tier.
+- **VAS owns content/SEO and stack-aware BaaS testing.** SiteSecurityScore contests the MCP wedge. Vibe Check contests the "exploitability not pattern-matching" and free angle.
+- **No competitor is bilingual.** Still the single uncontested lane.
+- Per-agent fix routing (distinct output for Claude Code vs Lovable vs Cursor) is **claimed by no one** — everyone exports generic markdown.
+
+---
+
+## 4. PLATFORM-NATIVE SECURITY — THE SCAN IS BEING ABSORBED
+
+The most strategically important shift: the coding platforms are building security in.
+
+### Lovable built-in Security Scanner
+Runs pre-publish, catching **exposed secrets and misconfigured database (RLS) policies** before publishing. Lovable describes it as "code review for theoretical issues." This means the **baseline scan is now free and native** for the largest vibe-coding platform's users — the floor of the indie market is being absorbed.
+
+### Lovable × Aikido — "Vibe, Fix, Ship" (the headline launch)
+- **Announced on Product Hunt March 24, 2026**; appears in Aikido's **Changelog #45 on April 10, 2026** (the two dates reconcile as announce-vs-changelog, resolving an earlier internal discrepancy).
+- **What it is:** Aikido deploys a **swarm of autonomous agents** against the live app — probing logins, attempting cross-user data access, chaining weaknesses into exploit paths, testing APIs, adapting to responses. Can operate in **whitebox mode** using the Lovable-hosted source.
+- **Confirmed-only findings:** because it validates via real attack scenarios, "you only see exploitable vulnerabilities, not theoretical risks" — findings sync into Lovable's Security view with AI remediation; output is an **audit-ready report for SOC 2 / ISO 27001 / vendor questionnaires**.
+- **Pricing:** **$100 per pentest** at launch (100 Aikido credits through end of June 2026), plus periodic free "Security Weekends."
+- **The limitation (and the opening):** it "only protects apps built and hosted on Lovable." Apps on Bolt, Cursor, Replit, custom hosting are out of scope.
+
+### The "agents securing agents" framing
+Aikido also launched **Aikido Infinite** (Feb 2026), continuous self-remediating AI pentesting, and became **AWS's first global security partner for Kiro** (security in the agentic IDE workflow from the first line). The strategic narrative is explicit: as coding agents generate code faster than humans can review, security testing must itself become agentic.
+
+---
+
+## 5. ENTERPRISE APPSEC — REACHING DOWN INTO AI CODE
+
+### Aikido (the 800-lb gorilla now in the lane)
+ASPM platform, **50,000+ organizations, 100,000+ teams**, founded 2022 Ghent/SF, SOC 2 Type II + ISO 27001. Bundles SAST, DAST, SCA, container, secrets, CSPM, IaC, runtime. **AutoTriage cuts alert noise by 95%** (the signal-quality benchmark the whole market is now measured against). Customers include Revolut, Niantic, Premier League, SoundCloud. Recent: AI Pentest escalation, AutoTriage custom context, "Talk to Aikido AutoFix" (refine fixes via natural-language prompts), batch-fix merge-ready PRs.
+
+### Snyk — AI Trust Platform / DeepCode AI
+Symbolic + generative hybrid trained on 25M+ cases; context-aware fixes in PRs; SCA across 15M+ packages. Enterprise-tier, IDE/CI integration, vendor-locked to Snyk findings.
+
+### GitHub Advanced Security (unbundled, April 2025)
+**Code Security at $30/committer/mo** (CodeQL SAST + Copilot Autofix + campaigns); **Secret Protection at $19/committer/mo** (push protection). Locked to GitHub + CodeQL findings after GitHub ended third-party SAST support.
+
+### Checkmarx Developer Assist
+Real-time in-IDE secure-coding assistant (Cursor, Windsurf, VS Code, AWS Kiro); pre-commit remediation; one-month free trial.
+
+### Pixee (Pixeebot)
+Scanner-agnostic remediation: ingests findings from 50+ tools via SARIF, fixes via deterministic Codemods + AI MagicMods, validates each fix before opening a PR. Decouples detection from fixing — a different model entirely (you keep your scanner, Pixee fixes).
+
+### Enterprise takeaway
+These are $20K–$40K+/yr or per-committer products, enterprise-shaped, high setup friction. **Seclayer doesn't compete here** — but the existence of Aikido reaching down means the *ceiling* on indie pricing is real, and the *vocabulary* (ASPM, confirmed-only findings, 95% noise reduction, audit-ready reports) sets buyer expectations even at the low end.
+
+---
+
+## 6. BROADER SECURITY-APP LAUNCHES (CONTEXT)
+
+> From the secondary research track. Some items below originate in an AI-generated survey doc; treat specific dates/versions as **unverified** unless independently confirmed. Included for situational awareness, not as a basis for claims to customers.
+
+**Developer-facing / IDE security (verified categories):**
+- **Checkmarx Developer Assist** — in-IDE, real-time (verified pattern; see §5).
+- **Snyk AI Trust Platform** — AI-code/agentic/supply-chain focus (verified pattern; see §5).
+- **GitHub GHAS unbundling** — Code Security $30 / Secret Protection $19 (verified; see §5).
+- **PrivateCode / Vibecoder.gg** — local-LLM coding assistant via Ollama, privacy-first (single-source, unverified).
+
+**Infrastructure / agent-governance layer (largely from the survey doc — UNVERIFIED):**
+- **Microsoft "Agent Governance Toolkit"** (claimed MIT-licensed, OWASP Agentic Top-10, sub-ms policy enforcement) — *unverified*.
+- **"Bifrost" Go gateway** (claimed ~11µs overhead at 5,000 RPS, MCP tool filtering, Vault) — *unverified*.
+- **TrueFoundry** AI/MCP gateway, VPC-isolated — *plausible but unverified at the specifics cited*.
+- **Datadog AI Agent Monitoring** (GA June 2025, agent decision-path mapping) — *plausible; verify before citing*.
+
+**Mobile / OS / consumer (from survey doc — UNVERIFIED, do not cite):**
+- **Android 17 "Live Threat Detection," AISeal/pKVM** (claimed May 12, 2026) — *unverified*.
+- **White House mobile app w/ Veridium** (claimed March 31, 2026) — *unverified*.
+- **Appknox MAST** scanning volume stats — *unverified*.
+
+> **Why this section is hedged:** the broader-survey source mixed real industry patterns with fabricated specifics (invented model benchmarks, precise dates, latency numbers). The *categories* are real and worth knowing — runtime agent governance, MCP gateways, in-IDE assistants, mobile MAST are all genuine 2025–2026 movements — but the *specific products/dates/numbers* above should be independently verified before they inform any decision or external claim.
+
+---
+
+## 7. MARKET MAP — WHERE EVERYONE SITS
+
+| Tier | Players | Price band | Coverage | Fix model |
+|---|---|---|---|---|
+| Platform-native | Lovable built-in scanner | Free | Config + RLS, pre-publish | One-click in-platform |
+| Platform pentest | Lovable × Aikido | $100/test | Runtime, confirmed-only, whitebox | Sync to Lovable + AI fix |
+| Indie scanner | VAS, SiteSecurityScore, Vibe Check, VibeSecurity, VibeEval, ChakraView, VibeDoctor | $0–$99/mo | Mostly config + some BaaS; few do code | Generic markdown / AI-ready |
+| Enterprise ASPM | Aikido, Snyk, GitHub GHAS, Checkmarx | $19/committer–$40K+/yr | Full SAST/DAST/SCA/runtime | PRs, autofix, batch |
+| Remediation-only | Pixee | Per-repo / free OSS | (ingests others' findings) | Validated PRs |
+
+**The squeeze:** indie scanners are compressed between free platform-native scanning (below) and Aikido's reach-down (above). Survival requires owning ground neither can cheaply take.
+
+---
+
+## 8. WHAT IT MEANS FOR SECLAYER
+
+**The honest position:** the deep black-box scan — even Seclayer's strong 97-check + BaaS engine — is now **table stakes**, being absorbed into Lovable for free and out-classed at runtime by Aikido's confirmed-only agent swarm. Scan depth alone is not a business.
+
+**The four defensible moves, in priority order:**
+
+1. **Per-agent fix routing — own it loudly.** Every competitor exports generic markdown. Distinct, applyable output for Claude Code/Codex vs workspace-prompt-plus-guardrail for Cursor vs scoped paste-prompt for Lovable/Replit is *claimed by no one*. This is the clearest open differentiator.
+2. **MCP-native, multi-platform — but move fast.** SiteSecurityScore already contests this (Claude Code + Codex MCP). The opening: Seclayer covers **apps on any host**, not just Lovable (Aikido's stated limitation), and closes the loop in-editor across more agents. First-mover urgency here — the wedge is being claimed.
+3. **Bilingual EN/ES — uncontested, build it.** Zero competitors in any tier. The entire LatAm + US-Hispanic non-technical-founder market (the 63% who aren't developers) is wide open. This is the standing WebHorizon edge nobody can quickly copy.
+4. **Continuous + anti-regression.** VibeEval's "a pentest is a snapshot, the next prompt re-breaks it" argument is correct and resonant. LLM-free header/RLS monitoring is cheap to run and counters both the one-off scan and the $100 Aikido snapshot.
+
+**Pricing reality:** anchor at $9 (matches VAS Starter), reserve depth for $19–$29, continuous for ~$99/mo. Metered, not unlimited (economics in Blueprint v3 §2).
+
+**Signal quality is now a competitive axis, not a nicety.** Aikido's "95% fewer alerts" and Lovable/Aikido's "confirmed-only findings" have set the buyer expectation. Seclayer's false-positive-prevention plan (the confidence axis, by-design suppression) isn't just hygiene — it's competitive parity with how the leaders now market.
+
+**What to stop saying:** "deep scan" / "most checks." Everyone's deep. Lead with the loop (scan→fix-in-your-agent→verify), the languages, and the any-host reach.
+
+---
+
+## 9. OPEN QUESTIONS / WATCH LIST
+
+- Does Lovable extend its free native scanner to match VAS's BaaS depth? (Would further compress the indie floor.)
+- Will Aikido drop a self-serve, non-Lovable, sub-$50 tier? (Would directly threaten the indie deep tier.)
+- Does SiteSecurityScore's MCP integration gain traction / add fix routing? (Direct wedge contest.)
+- Bolt, Cursor, Replit native security responses? (Lovable moved first; others likely follow — watch for absorption of the scan on those platforms too.)
+- Verify the §6 infrastructure/mobile items before any use — several originate in an unreliable survey doc.
+
+---
+
+*Full Landscape Report · May 30, 2026 · Carlos Cuellar — WebHorizon Laredo Digital Solutions*
+*Companion to SECLAYER-MASTER-BLUEPRINT-v3.md. Primary-source-verified where cited; survey-doc items flagged unverified. Re-verify pricing/launches before external use — this market moves weekly.*
