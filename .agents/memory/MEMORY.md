@@ -1,0 +1,1 @@
+- [FP-Prevention Architecture](fp-prevention-architecture.md) — scanner FP strategy: SPA catch-all baseline, JWT role decode, entropy checks, two-axis severity/confidence model
