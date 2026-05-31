@@ -1,1 +1,2 @@
 - [FP-Prevention Architecture](fp-prevention-architecture.md) — scanner FP strategy: SPA catch-all baseline, JWT role decode, entropy checks, two-axis severity/confidence model
+- [Monitor v2 schema](monitor-v2-schema.md) — 3 new tables + 4 new columns for score history, regressions, cert expiry, webhooks, adaptive cadence.
