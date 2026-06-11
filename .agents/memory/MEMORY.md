@@ -1,1 +1,2 @@
 - [Shared lib build requirement](shared-lib-build.md) — all 4 workspace libs need `tsc -p tsconfig.json` before typecheck; typecheck workflow pre-builds them now
+- [Vitest fetch mocking](vitest-fetch-mocking.md) — use vi.stubGlobal / vi.unstubAllGlobals for fetch, not vi.spyOn; network failures need mockRejectedValue not synchronous throw
