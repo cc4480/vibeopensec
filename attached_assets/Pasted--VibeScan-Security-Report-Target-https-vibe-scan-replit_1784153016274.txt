@@ -1,0 +1,150 @@
+# VibeScan Security Report
+
+**Target:** https://vibe-scan.replit.app/
+**Scanned:** July 15, 2026
+**Security Grade:** C | Risk Score: 27/100
+**Total Findings:** 8  (0 critical · 1 high · 2 medium · 2 low · 3 info)
+
+## Executive Summary
+
+Security scan of vibe-scan.replit.app identified 1 high-severity issue that should be addressed promptly, yielding an overall grade of C with a risk score of 27/100. Review the findings below and prioritise the high and critical items first.
+
+## ✅ Confirmed Findings (8)
+
+#### 🟠 HIGH — Missing Content-Security-Policy (CSP)
+**Category:** Injection Defense
+
+**Description:** No Content-Security-Policy header was found. CSP is the primary browser-enforced defense against Cross-Site Scripting (XSS) attacks. Without it, injected scripts can run with full page privileges and steal session cookies or credentials.
+
+**Evidence:**
+```
+GET https://vibe-scan.replit.app/
+Content-Security-Policy: (header absent from response)
+```
+**How to Fix:** Implement a strict CSP. A starting point: Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'. Tighten over time using CSP violation reports.
+
+**References:** CWE-79 | CVSS 7.2 | WSTG-CONF-12
+
+---
+
+#### 🟡 MEDIUM — Missing Clickjacking Protection (X-Frame-Options)
+**Category:** UI Security
+
+**Description:** The application does not set X-Frame-Options or CSP frame-ancestors. Attackers can embed your pages in invisible iframes on malicious sites and trick users into clicking UI elements (clickjacking).
+
+**Evidence:**
+```
+GET https://vibe-scan.replit.app/
+X-Frame-Options: (header absent)
+CSP frame-ancestors: (not present in Content-Security-Policy)
+```
+**How to Fix:** Add: X-Frame-Options: DENY (or SAMEORIGIN if you need to embed within your own domain). Alternatively use: Content-Security-Policy: frame-ancestors 'none'
+
+**References:** CWE-1021 | CVSS 4.3 | WSTG-CLNT-09
+
+---
+
+#### 🟡 MEDIUM — Missing X-Content-Type-Options: nosniff
+**Category:** Content Sniffing
+
+**Description:** The X-Content-Type-Options header is absent or not set to 'nosniff'. Browsers may MIME-sniff response content and execute it as a different content type, enabling content-injection attacks.
+
+**Evidence:**
+```
+GET https://vibe-scan.replit.app/
+X-Content-Type-Options: (header absent from response)
+```
+**How to Fix:** Add to all responses: X-Content-Type-Options: nosniff
+
+**References:** CWE-16 | CVSS 4.3 | WSTG-CONF-07
+
+---
+
+#### 🔵 LOW — Missing Referrer-Policy Header
+**Category:** Information Disclosure
+
+**Description:** No Referrer-Policy header is set. By default, browsers may include the full URL of the previous page in the Referer header, potentially leaking sensitive URL parameters (session tokens, search queries) to third-party sites.
+
+**Evidence:**
+```
+GET https://vibe-scan.replit.app/
+Referrer-Policy: (header absent from response)
+```
+**How to Fix:** Add: Referrer-Policy: strict-origin-when-cross-origin (or 'no-referrer' for maximum privacy)
+
+**References:** CWE-200 | CVSS 3.1 | WSTG-CONF-07
+
+---
+
+#### 🔵 LOW — Missing Permissions-Policy Header
+**Category:** Browser Feature Control
+
+**Description:** No Permissions-Policy (formerly Feature-Policy) header is present. This header restricts which browser APIs (camera, microphone, geolocation, etc.) can be accessed from your pages and embedded iframes.
+
+**Evidence:**
+```
+GET https://vibe-scan.replit.app/
+Permissions-Policy: (header absent from response)
+```
+**How to Fix:** Add: Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=(). Adjust based on what your app actually needs.
+
+**References:** CWE-16 | CVSS 2.4 | WSTG-CONF-07
+
+---
+
+#### ⚪ INFO — Missing Cross-Origin-Opener-Policy (COOP)
+**Category:** Browser Feature Control
+
+**Description:** The Cross-Origin-Opener-Policy header is not set. COOP isolates your browsing context from cross-origin popups, preventing other pages from accessing your window object. It is required to safely enable SharedArrayBuffer and high-resolution timers. Most public web apps do not need these APIs, so absence is typically informational — but enabling COOP is a free defence-in-depth measure.
+
+**Evidence:**
+```
+GET https://vibe-scan.replit.app/
+Cross-Origin-Opener-Policy: (header absent from response)
+```
+**How to Fix:** Add: Cross-Origin-Opener-Policy: same-origin (most secure) or same-origin-allow-popups if you need cross-origin popup interaction. Only required if you use SharedArrayBuffer or high-resolution timers.
+
+**References:** CWE-346 | WSTG-CONF-07
+
+---
+
+#### ⚪ INFO — Missing Cross-Origin-Embedder-Policy (COEP)
+**Category:** Browser Feature Control
+
+**Description:** The Cross-Origin-Embedder-Policy header is not set. COEP (require-corp) prevents the page from loading cross-origin resources unless they explicitly opt in. It is required alongside COOP to achieve cross-origin isolation. Absence is informational for most sites — only needed if your app uses SharedArrayBuffer or high-resolution performance timers.
+
+**Evidence:**
+```
+GET https://vibe-scan.replit.app/
+Cross-Origin-Embedder-Policy: (header absent from response)
+```
+**How to Fix:** Add: Cross-Origin-Embedder-Policy: require-corp. Note: this requires all subresources to serve a CORP or CORS header. Use credentialless if require-corp causes third-party resource breakage.
+
+**References:** CWE-346 | WSTG-CONF-07
+
+---
+
+#### ⚪ INFO — Missing Cross-Origin-Resource-Policy (CORP)
+**Category:** Browser Feature Control
+
+**Description:** The Cross-Origin-Resource-Policy header is absent. Without CORP, other origins can include this resource in their pages (via <img>, <script>, etc.). In cross-origin isolated contexts this could expose content to Spectre-class timing attacks. For most public resources this is informational — but adding CORP: same-origin or same-site is a low-effort hardening step.
+
+**Evidence:**
+```
+GET https://vibe-scan.replit.app/
+Cross-Origin-Resource-Policy: (header absent from response)
+```
+**How to Fix:** Add: Cross-Origin-Resource-Policy: same-origin (for same-site-only resources) or same-site. Use cross-origin only for truly public resources.
+
+**References:** CWE-346 | WSTG-CONF-07
+
+---
+
+## 🖥️ Tech Profile
+
+- **TLS Grade:** A+
+- **Server:** Google Frontend
+- **Technologies:** Google Cloud / GFE
+
+---
+*Generated by VibeScan — https://vibescan.app*
