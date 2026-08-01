@@ -1,3 +1,5 @@
 - [Shared lib build requirement](shared-lib-build.md) — all 4 workspace libs need `tsc -p tsconfig.json` before typecheck; typecheck workflow pre-builds them now
 - [Vitest fetch mocking](vitest-fetch-mocking.md) — use vi.stubGlobal / vi.unstubAllGlobals for fetch, not vi.spyOn; network failures need mockRejectedValue not synchronous throw
 - [React preamble crash in Replit canvas](react-preamble-replit.md) — Replit's canvas DevTools hook lacks a Map renderers; patch window.__REACT_DEVTOOLS_GLOBAL_HOOK__ before any module scripts run
+- [FP-Prevention Architecture](fp-prevention-architecture.md) — scanner FP strategy: SPA catch-all baseline, JWT role decode, entropy checks, two-axis severity/confidence model
+- [Monitor v2 schema](monitor-v2-schema.md) — 3 new tables + 4 new columns for score history, regressions, cert expiry, webhooks, adaptive cadence.
