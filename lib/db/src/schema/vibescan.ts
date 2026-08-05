@@ -213,3 +213,24 @@ export const eolCacheTable = pgTable("eol_cache", {
   payload: jsonb("payload").notNull(),
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
 });
+
+// ── CI/CD API keys ──────────────────────────────────────────────────────────
+// Long-lived, revocable tokens for programmatic (CI) scan access — distinct
+// from the browser-oriented UUID bearer token. Only a hash is stored; the
+// plaintext token is shown once at creation time.
+
+export const ciApiKeysTable = pgTable("ci_api_keys", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull().default("CI key"),
+  tokenHash: text("token_hash").notNull(),
+  tokenPrefix: text("token_prefix").notNull(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("uq_ci_api_keys_token_hash").on(table.tokenHash),
+  index("idx_ci_api_keys_user_id").on(table.userId),
+]);
+
+export type CiApiKey = typeof ciApiKeysTable.$inferSelect;

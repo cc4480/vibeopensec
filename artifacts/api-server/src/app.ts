@@ -2,13 +2,14 @@ import express, { type Express } from "express";
 import cors, { type CorsOptions } from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import nodePath from "node:path";
 import { fileURLToPath } from "node:url";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { resolveShare } from "./routes/shares";
 
 const __dirname = nodePath.dirname(fileURLToPath(import.meta.url));
 
@@ -169,6 +170,45 @@ if (process.env.NODE_ENV !== "production") {
 
   if (existsSync(staticDir)) {
     logger.info({ staticDir }, "Production: serving static frontend");
+
+    // Link-unfurling bots (Slack, Discord, Twitter, iMessage, …) don't execute
+    // JS, so the client-side useSeo() meta mutation never reaches them for a
+    // shared report at /share/:token. Serve the same SPA shell but with the
+    // OG title/description substituted server-side for this one dynamic route,
+    // ahead of the static handler below so it takes priority.
+    app.get("/share/:token", async (req, res, next) => {
+      try {
+        const indexPath = nodePath.join(staticDir, "index.html");
+        let html = readFileSync(indexPath, "utf-8");
+        const resolved = await resolveShare(req.params.token);
+
+        if (resolved.status === "ok") {
+          const hostname = (() => {
+            try { return new URL(resolved.targetUrl).hostname; } catch { return resolved.targetUrl; }
+          })();
+          const title = `Grade ${resolved.grade ?? "?"} — ${hostname} | Seclayer Security Report`;
+          const description =
+            `Security scan of ${resolved.targetUrl}: Grade ${resolved.grade ?? "?"}` +
+            (resolved.riskScore != null ? `, risk score ${resolved.riskScore}/100.` : ".") +
+            " Powered by Seclayer.";
+
+          html = html
+            .replace(/<title>.*?<\/title>/, `<title>${title}</title>`)
+            .replace(/(<meta property="og:title" content=")[^"]*(")/, `$1${title}$2`)
+            .replace(/(<meta property="og:description" content=")[^"]*(")/, `$1${description}$2`)
+            .replace(/(<meta name="twitter:title" content=")[^"]*(")/, `$1${title}$2`)
+            .replace(/(<meta name="twitter:description" content=")[^"]*(")/, `$1${description}$2`)
+            .replace(/(<meta name="description" content=")[^"]*(")/, `$1${description}$2`);
+        }
+
+        res.setHeader("Content-Type", "text/html");
+        res.send(html);
+      } catch (err) {
+        logger.warn({ err }, "OG card injection failed for /s/:token — falling back to default shell");
+        next();
+      }
+    });
+
     app.use(express.static(staticDir, { dotfiles: "allow" }));
     // SPA fallback — client-side routes (e.g. /report/abc) must receive index.html
     app.get(/.*/, (_req, res) => {

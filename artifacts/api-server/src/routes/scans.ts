@@ -11,6 +11,12 @@ import { enqueueScan } from "../lib/queue";
 
 const router: IRouter = Router();
 
+function parseLangHeader(req: { headers: Record<string, string | string[] | undefined> }): "en" | "es" {
+  const raw = req.headers["x-vibescan-lang"];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return value === "es" ? "es" : "en";
+}
+
 const STATUS_PROGRESS: Record<string, number> = {
   pending: 0,
   paid: 10,
@@ -85,6 +91,7 @@ router.post("/scans", async (req, res): Promise<void> => {
   }
 
   const { targetUrl, tier } = parsed.data;
+  const lang = parseLangHeader(req);
 
   const isPack = tier === "pack_5" || tier === "pack_20";
   const paymentsDisabled = process.env.DISABLE_PAYMENTS === "true";
@@ -115,7 +122,7 @@ router.post("/scans", async (req, res): Promise<void> => {
       })
       .returning();
 
-    await enqueueScan({ scanId: scan.id, userId: req.user.id, targetUrl, tier });
+    await enqueueScan({ scanId: scan.id, userId: req.user.id, targetUrl, tier, lang });
 
     await db
       .update(scansTable)

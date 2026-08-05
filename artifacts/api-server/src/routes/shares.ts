@@ -18,6 +18,41 @@ function computeExpiry(expiresIn: "7d" | "30d" | "never"): Date | null {
   return d;
 }
 
+export type ResolvedShare =
+  | { status: "ok"; targetUrl: string; grade: string | null; riskScore: number | null }
+  | { status: "not_found" }
+  | { status: "expired" };
+
+/**
+ * Shared lookup used by both the public share JSON API and the OG-card
+ * middleware in app.ts — a non-revoked, non-expired share plus its report's
+ * grade/risk score, or a status explaining why it's unavailable.
+ */
+export async function resolveShare(token: string): Promise<ResolvedShare> {
+  const [share] = await db
+    .select()
+    .from(reportSharesTable)
+    .where(and(eq(reportSharesTable.token, token), isNull(reportSharesTable.revokedAt)));
+
+  if (!share) return { status: "not_found" };
+  if (share.expiresAt && share.expiresAt < new Date()) return { status: "expired" };
+
+  const [report] = await db
+    .select({ targetUrl: reportsTable.targetUrl, data: reportsTable.data })
+    .from(reportsTable)
+    .where(eq(reportsTable.id, share.reportId));
+
+  if (!report) return { status: "not_found" };
+
+  const data = report.data as { summary?: { grade?: string; riskScore?: number } } | undefined;
+  return {
+    status: "ok",
+    targetUrl: report.targetUrl,
+    grade: data?.summary?.grade ?? null,
+    riskScore: data?.summary?.riskScore ?? null,
+  };
+}
+
 // ── POST /api/reports/:id/shares — create a share link ────────────────────────
 router.post("/reports/:id/shares", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
@@ -215,6 +250,58 @@ router.get("/share/:token", async (req, res): Promise<void> => {
     req.log.error({ err }, "Failed to fetch shared report");
     res.status(500).json({ error: "Failed to fetch shared report" });
   }
+});
+
+// ── GET /api/badge/:token.svg — public, embeddable grade badge ────────────────
+// No auth required — same trust model as the share link itself (possession of
+// the token is the access control). Hand-templated SVG; no image library needed.
+
+const GRADE_BADGE_COLORS: Record<string, { fg: string; bg: string }> = {
+  A: { fg: "#34d399", bg: "#0f2e22" },
+  B: { fg: "#4ade80", bg: "#122a17" },
+  C: { fg: "#facc15", bg: "#332a0a" },
+  D: { fg: "#fb923c", bg: "#332310" },
+  F: { fg: "#f87171", bg: "#331414" },
+};
+
+function gradeBadgeSvg(grade: string | null): string {
+  const key = grade ?? "?";
+  const colors = GRADE_BADGE_COLORS[key] ?? { fg: "#9ca3af", bg: "#1f2430" };
+  const label = "VibeScan";
+  const width = 118;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="20" role="img" aria-label="${label}: ${key}">
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#fff" stop-opacity=".08"/>
+    <stop offset="1" stop-opacity=".08"/>
+  </linearGradient>
+  <clipPath id="r"><rect width="${width}" height="20" rx="4" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="80" height="20" fill="#1a231f"/>
+    <rect x="80" width="${width - 80}" height="20" fill="${colors.bg}"/>
+    <rect width="${width}" height="20" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="11">
+    <text x="41" y="14" fill="#0b0f0d" fill-opacity=".3">${label}</text>
+    <text x="40" y="13">${label}</text>
+    <text x="${80 + (width - 80) / 2}" y="14" fill="#0b0f0d" fill-opacity=".3" font-weight="bold">${key}</text>
+    <text x="${80 + (width - 80) / 2 - 1}" y="13" fill="${colors.fg}" font-weight="bold">${key}</text>
+  </g>
+</svg>`;
+}
+
+router.get("/badge/:token.svg", async (req, res): Promise<void> => {
+  const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+  const resolved = await resolveShare(token);
+
+  res.setHeader("Content-Type", "image/svg+xml");
+  res.setHeader("Cache-Control", "public, max-age=300"); // 5 min — grade can change on rescan
+
+  if (resolved.status !== "ok") {
+    res.status(resolved.status === "expired" ? 410 : 404).send(gradeBadgeSvg(null));
+    return;
+  }
+
+  res.send(gradeBadgeSvg(resolved.grade));
 });
 
 export default router;

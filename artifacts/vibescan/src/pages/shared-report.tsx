@@ -26,7 +26,7 @@ export default function SharedReport() {
   const seoDescription = report
     ? `Security scan of ${report.targetUrl}: Grade ${report.data.summary.grade}, risk score ${report.data.summary.riskScore}/100, ${report.data.summary.totalVulnerabilities} finding${report.data.summary.totalVulnerabilities !== 1 ? "s" : ""}. Powered by Seclayer.`
     : "View this security scan report powered by Seclayer — black-box penetration testing for web applications.";
-  useSeo({ title: seoTitle, description: seoDescription, canonical: `https://seclayer.io/s/${token}` });
+  useSeo({ title: seoTitle, description: seoDescription, canonical: `https://seclayer.io/share/${token}` });
 
   // PDF generation state — must be declared before any conditional returns (Rules of Hooks)
   const pdfContainerRef = useRef<HTMLDivElement>(null);

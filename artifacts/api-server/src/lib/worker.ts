@@ -69,7 +69,7 @@ import { reprobe } from "./reprobe";
  */
 
 async function processScanJob(job: ScanJob): Promise<void> {
-  const { scanId, userId, targetUrl, tier, monitorSubscriptionId } = job.data;
+  const { scanId, userId, targetUrl, tier, monitorSubscriptionId, lang } = job.data;
   const log = logger.child({ scanId, targetUrl, tier, monitorSubscriptionId });
 
   log.info("Scan job started");
@@ -233,6 +233,7 @@ async function processScanJob(job: ScanJob): Promise<void> {
       vulnsForAi,
       scanResult.technologies,
       tier,
+      lang ?? "en",
     );
     if (aiAnalysis) {
       log.info("DeepSeek analysis complete");

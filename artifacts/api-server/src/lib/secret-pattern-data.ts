@@ -22,7 +22,7 @@ export interface SecretPattern {
  * Real secret keys score > 3.5; placeholders / repeating patterns score < 3.0.
  * Used to filter low-entropy false positives in generic secret patterns.
  */
-function shannonEntropy(s: string): number {
+export function shannonEntropy(s: string): number {
   if (s.length === 0) return 0;
   const freq: Record<string, number> = {};
   for (const c of s) freq[c] = (freq[c] ?? 0) + 1;

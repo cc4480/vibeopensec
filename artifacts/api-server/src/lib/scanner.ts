@@ -87,7 +87,7 @@ async function isHstsPreloaded(hostname: string): Promise<boolean> {
 import { runAllProbes } from "./probes";
 import { checkDnsSecurity } from "./dnsChecks";
 import { scanJavaScriptForSecrets } from "./jsScanner";
-import { crawlAndCheck } from "./crawler";
+import { crawlAndCheck, checkUrlEmbeddedSecrets } from "./crawler";
 import { checkForKnownVulnerabilities, extractVersionedTechnologies } from "./cveCheck";
 import { analyzeJwts } from "./jwtAnalysis";
 import { checkSubdomainTakeover } from "./subdomainTakeover";
@@ -723,6 +723,8 @@ export async function runScan(targetUrl: string, tier: string): Promise<ScanResu
       scanJavaScriptForSecrets(html, finalUrl).catch(() => []),
       // Active path traversal probing — multiple HTTP requests
       checkPathTraversal(finalUrl, html).catch(() => []),
+      // API credentials embedded in link/script URL query strings
+      Promise.resolve(checkUrlEmbeddedSecrets(html, finalUrl)).catch(() => []),
     );
   }
 

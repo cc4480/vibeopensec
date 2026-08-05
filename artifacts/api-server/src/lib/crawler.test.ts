@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { extractInternalLinks } from "./crawler.js";
+import { extractInternalLinks, checkUrlEmbeddedSecrets } from "./crawler.js";
 
 const BASE = "https://example.com";
+// Not a Stripe-shaped prefix on purpose — this only needs to look like a
+// plausible URL-embedded credential for checkUrlEmbeddedSecrets to flag,
+// not trigger GitHub's Stripe-key push-protection pattern.
+const REAL_LOOKING_KEY = "cred_9fK3mQzR7vLpXeT2wNbYcAj4_lookalike";
 
 describe("extractInternalLinks", () => {
   it("returns empty array for an invalid baseUrl", () => {
@@ -107,5 +111,57 @@ describe("extractInternalLinks", () => {
     expect(result).toContain("https://example.com/about");
     expect(result).toContain("https://example.com/pricing");
     expect(result).toContain("https://example.com/blog");
+  });
+});
+
+describe("checkUrlEmbeddedSecrets", () => {
+  it("flags a real-looking API key in an href query string", () => {
+    const html = `<a href="/api/export?api_key=${REAL_LOOKING_KEY}">Export</a>`;
+    const result = checkUrlEmbeddedSecrets(html, BASE);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("API Credential Exposed in URL Query String");
+    expect(result[0]!.evidence).not.toContain(REAL_LOOKING_KEY);
+  });
+
+  it("flags a real-looking API key inside an inline script fetch call", () => {
+    const html = `<script>fetch("https://api.example.com/v1/data?access_token=${REAL_LOOKING_KEY}");</script>`;
+    expect(checkUrlEmbeddedSecrets(html, BASE)).toHaveLength(1);
+  });
+
+  it("ignores a generic 'token' param (too commonly legitimate)", () => {
+    const html = `<a href="/reset?token=${REAL_LOOKING_KEY}">Reset</a>`;
+    expect(checkUrlEmbeddedSecrets(html, BASE)).toHaveLength(0);
+  });
+
+  it("ignores a credential-named param on a password-reset path", () => {
+    const html = `<a href="/reset-password?api_key=${REAL_LOOKING_KEY}">Reset</a>`;
+    expect(checkUrlEmbeddedSecrets(html, BASE)).toHaveLength(0);
+  });
+
+  it("ignores placeholder values", () => {
+    const html = `<a href="/api?api_key=YOUR_API_KEY_HERE">Docs</a>`;
+    expect(checkUrlEmbeddedSecrets(html, BASE)).toHaveLength(0);
+  });
+
+  it("ignores low-entropy values", () => {
+    const html = `<a href="/api?api_key=aaaaaaaaaaaaaaaa">Docs</a>`;
+    expect(checkUrlEmbeddedSecrets(html, BASE)).toHaveLength(0);
+  });
+
+  it("ignores short values", () => {
+    const html = `<a href="/api?api_key=abc123">Docs</a>`;
+    expect(checkUrlEmbeddedSecrets(html, BASE)).toHaveLength(0);
+  });
+
+  it("returns empty array for empty HTML", () => {
+    expect(checkUrlEmbeddedSecrets("", BASE)).toEqual([]);
+  });
+
+  it("deduplicates the same param name found in multiple places", () => {
+    const html = `
+      <a href="/a?api_key=${REAL_LOOKING_KEY}">1</a>
+      <a href="/b?api_key=${REAL_LOOKING_KEY}">2</a>
+    `;
+    expect(checkUrlEmbeddedSecrets(html, BASE)).toHaveLength(1);
   });
 });

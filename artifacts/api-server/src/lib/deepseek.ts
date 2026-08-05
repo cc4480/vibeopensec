@@ -81,12 +81,15 @@ const VIBE_FRAMEWORKS = [
   "remix", "angular", "astro", "gatsby", "vercel", "netlify",
 ];
 
+export type ReportLanguage = "en" | "es";
+
 function buildPrompt(
   targetUrl: string,
   vulnerabilities: ScanVulnerability[],
   technologies: string[],
   tier: string,
   agent: AgentEnvironment,
+  lang: ReportLanguage,
 ): string {
   const techStack = technologies.length > 0 ? technologies.join(", ") : "unknown";
 
@@ -124,7 +127,12 @@ function buildPrompt(
 
   const agentInstructions = agentPromptInstructions(agent, domain);
 
-  return `You are a senior application security engineer (AppSec) writing a penetration test summary for a developer who built their app with an AI coding assistant and is not a security expert.${vibeCodingContext}
+  const languageInstruction =
+    lang === "es"
+      ? "\n\nWrite EVERY field in the JSON response — overallRisk, topPriorities, quickWins, complianceNotes, and agentFixPrompt — in natural, professional Spanish (Latin American Spanish register). Keep technical terms, product names, file paths, and code untranslated (e.g. Row Level Security, Supabase, CSP, service_role, file names)."
+      : "";
+
+  return `You are a senior application security engineer (AppSec) writing a penetration test summary for a developer who built their app with an AI coding assistant and is not a security expert.${vibeCodingContext}${languageInstruction}
 
 Target: ${targetUrl}
 Scan tier: ${tier}
@@ -170,6 +178,7 @@ export async function callDeepSeek(
   vulnerabilities: ScanVulnerability[],
   technologies: string[],
   tier: string,
+  lang: ReportLanguage = "en",
 ): Promise<AiAnalysisResult | null> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
@@ -178,7 +187,10 @@ export async function callDeepSeek(
   }
 
   const agent = detectAgentEnvironment(technologies, targetUrl);
-  const prompt = buildPrompt(targetUrl, vulnerabilities, technologies, tier, agent);
+  const prompt = buildPrompt(targetUrl, vulnerabilities, technologies, tier, agent, lang);
+
+  const systemPreamble =
+    "You are a senior application security engineer specializing in securing AI-generated (vibe-coded) web applications. Your audience is developers who built their app with Cursor, Claude, or Lovable and have limited security knowledge. Your writing is direct, jargon-free, and highly actionable — every finding includes the exact file/config to change and why it matters in plain English. You are deeply familiar with the most common security mistakes in vibe-coded apps: exposed API keys in frontend bundles, client-side-only authentication, missing CSP, and unauthenticated API endpoints. Respond only with valid JSON as instructed. Do not add markdown fences, preamble, or explanation.";
 
   const body = {
     model: "deepseek-chat",
@@ -186,7 +198,9 @@ export async function callDeepSeek(
       {
         role: "system",
         content:
-          "You are a senior application security engineer specializing in securing AI-generated (vibe-coded) web applications. Your audience is developers who built their app with Cursor, Claude, or Lovable and have limited security knowledge. Your writing is direct, jargon-free, and highly actionable — every finding includes the exact file/config to change and why it matters in plain English. You are deeply familiar with the most common security mistakes in vibe-coded apps: exposed API keys in frontend bundles, client-side-only authentication, missing CSP, and unauthenticated API endpoints. Respond only with valid JSON as instructed. Do not add markdown fences, preamble, or explanation.",
+          lang === "es"
+            ? `${systemPreamble} Write all natural-language field values in the JSON response in professional Spanish, per the instructions in the user message.`
+            : systemPreamble,
       },
       {
         role: "user",

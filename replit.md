@@ -50,9 +50,10 @@ lib/
 
 ## Product
 
-- **Free tier**: Basic black-box scan (headers, SSL/TLS, tech fingerprint)
-- **Paid tiers**: Deep scan with DeepSeek AI report, scan credit packs (5 or 20)
-- **Monitor**: Continuous monitoring with weekly rescans and CVE-triggered alerts via email
+- **Free during early access**: all scan tiers and Monitor are free while the product is in beta — payments are gated off (`DISABLE_PAYMENTS=true`) and re-enable post-beta.
+- **Basic scan**: headers, SSL/TLS, tech fingerprint
+- **Deep scan**: adds JS secret scanning, DeepSeek AI report, per-agent fix prompt
+- **Monitor**: Continuous monitoring with risk-adaptive rescans (Monitor v2 — score history, regression detection, CVE/EPSS alerts, cert-expiry alerts, webhooks)
 - **Reports**: Graded A–F with CVSS scores, remediation steps, and paste-ready AI fix prompt
 
 ## User preferences

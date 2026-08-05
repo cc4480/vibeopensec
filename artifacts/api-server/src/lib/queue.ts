@@ -58,6 +58,8 @@ export interface ScanJobData {
   tier: string;
   /** Set when this scan was triggered by the monitor scheduler */
   monitorSubscriptionId?: string;
+  /** AI report language — UI chrome translation is handled entirely client-side. */
+  lang?: "en" | "es";
 }
 
 export async function enqueueScan(data: ScanJobData): Promise<string | null> {

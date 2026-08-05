@@ -8,6 +8,8 @@ import stripeRouter from "./stripe";
 import monitorRouter from "./monitor";
 import dismissalsRouter from "./dismissals";
 import sharesRouter from "./shares";
+import ciKeysRouter from "./ciKeys";
+import ciRouter from "./ci";
 
 const router: IRouter = Router();
 
@@ -20,5 +22,7 @@ router.use(stripeRouter);
 router.use(monitorRouter);
 router.use(dismissalsRouter);
 router.use(sharesRouter);
+router.use(ciKeysRouter);
+router.use(ciRouter);
 
 export default router;

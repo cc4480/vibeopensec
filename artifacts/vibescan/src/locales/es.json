@@ -1,0 +1,125 @@
+{
+  "nav": {
+    "home": "Inicio",
+    "dashboard": "Panel",
+    "monitor": "Monitoreo",
+    "learn": "Aprender",
+    "newScan": "Nuevo escaneo"
+  },
+  "footer": {
+    "tagline": "Tu app está en producción. ¿Es segura? © {{year}} Seclayer"
+  },
+  "landing": {
+    "hero": {
+      "badge": "Motor de análisis DeepSeek AI v1.0",
+      "titleLine1": "Cualquier sitio web.",
+      "titleLine2": "¿Es seguro?",
+      "subtitle": "Pega cualquier URL pública — tu app, el sitio de un cliente, o el de la competencia — y recibe un informe de seguridad en español claro en menos de 10 minutos. Sin instalar nada, sin agentes.",
+      "ctaScan": "Escanear mi app",
+      "ctaPricing": "Ver precios",
+      "trustClaim": "Los hallazgos Críticos y Altos requieren confirmación en vivo — datos reales devueltos, solicitud real exitosa — no solo una coincidencia de patrón."
+    },
+    "problem": {
+      "title": "Fallas comunes en apps lanzadas rápido",
+      "subtitle": "Los generadores de código con IA son excelentes para funcionalidades, pero suelen fallar en lo básico de seguridad. No dejes que tu lanzamiento termine en una filtración.",
+      "items": [
+        { "title": "Claves de API expuestas", "desc": "Credenciales escritas directamente en el bundle del cliente o en endpoints públicos sin límite de peticiones." },
+        { "title": "Faltan verificaciones de autenticación", "desc": "Rutas que asumen que el frontend las oculta, dejando la API completamente abierta." },
+        { "title": "Sin cabeceras de seguridad", "desc": "Falta de CSP, HSTS y opciones de frame que dejan tu app vulnerable a XSS y clickjacking." }
+      ]
+    },
+    "howItWorks": {
+      "title": "Cómo funciona Seclayer",
+      "subtitle": "Tres pasos para tener tranquilidad.",
+      "steps": [
+        { "title": "Pega cualquier URL", "desc": "Ingresa cualquier URL de acceso público — tu propia app, el sitio de un cliente, o cualquier sitio en vivo." },
+        { "title": "Escaneamos", "desc": "Nuestro motor recorre tus páginas, busca archivos y secretos expuestos, revisa SSL, DNS, cabeceras, y ejecuta más de 137 verificaciones de seguridad — sin necesidad de agentes." },
+        { "title": "Recibe tu informe", "desc": "DeepSeek AI traduce los hallazgos técnicos en un informe claro y accionable." }
+      ]
+    },
+    "aiBuilder": {
+      "eyebrow": "Hecho para apps generadas con IA",
+      "titleLine1": "Los builders de IA lanzan rápido.",
+      "titleLine2": "Los huecos de seguridad vienen gratis.",
+      "subtitle": "VibeScan conoce los riesgos específicos que dejan las apps generadas con Lovable, Bolt y Cursor — incluyendo fallas de Row Level Security en Supabase que exponen toda tu base de datos a lecturas anónimas.",
+      "cta": "Escanear mi app ahora",
+      "cards": [
+        { "title": "RLS de Supabase deshabilitado", "desc": "Detecta tablas que devuelven filas a solicitudes no autenticadas porque Row Level Security está deshabilitado." },
+        { "title": "Fuga de clave service_role", "desc": "Encuentra JWTs service_role de Supabase incrustados en el código del cliente — evaden todas las políticas de RLS (CVSS 10.0)." },
+        { "title": "Detección de builder de IA", "desc": "Identifica apps construidas con Lovable, Bolt.new, Cursor, Firebase y más — luego aplica verificaciones específicas." },
+        { "title": "Introspección de GraphQL", "desc": "Detecta endpoints de GraphQL expuestos donde la introspección del schema quedó habilitada — un error común en APIs generadas por IA." }
+      ]
+    },
+    "owasp": {
+      "eyebrow": "Cobertura OWASP Top 10",
+      "title": "Qué revisa Seclayer",
+      "subtitle": "Cada escaneo ejecuta una suite completa de pruebas de caja negra dirigida a los riesgos de seguridad web más críticos — sin instalar nada.",
+      "items": [
+        { "title": "Control de acceso roto", "desc": "Busca rutas de administración expuestas públicamente, listado de directorios, y falta de autenticación en páginas recorridas." },
+        { "title": "Fallas criptográficas", "desc": "Calificación SSL/TLS vía Qualys SSL Labs, fortaleza de cifrado, aplicación de HSTS y validez del certificado." },
+        { "title": "Riesgos de inyección", "desc": "Detecta patrones de reflexión de entradas, falta de validación de content-type, y errores demasiado detallados en endpoints probados." },
+        { "title": "Configuración de seguridad incorrecta", "desc": "Cabeceras de seguridad (CSP, X-Frame-Options, CORP, COOP), divulgación de versión del servidor, modos de depuración, e introspección de GraphQL abierta." },
+        { "title": "Componentes vulnerables", "desc": "Identificación de tecnologías — detecta más de 30 frameworks, CDNs y plataformas de IA, y las cruza con CVEs conocidos." },
+        { "title": "Fallas de autenticación y sesión", "desc": "Flags de cookies (HttpOnly, Secure, SameSite), indicadores de fijación de sesión, y detección de RLS deshabilitado en Supabase." },
+        { "title": "Secretos y archivos expuestos", "desc": "Prueba activamente .env, .git/HEAD, .git/config, wp-config.php, phpinfo.php, backup.sql, y specs de API/OpenAPI expuestas." },
+        { "title": "Seguridad de correo (SPF y DMARC)", "desc": "Revisa registros SPF y DMARC faltantes o mal configurados que permiten enviar correos falsificados desde tu dominio." },
+        { "title": "Recorrido de páginas internas", "desc": "Sigue enlaces internos para revisar subpáginas en busca de configuraciones filtradas, logs de depuración, documentación de API expuesta y archivos de entorno — no solo la raíz." }
+      ]
+    },
+    "pricing": {
+      "eyebrow": "Acceso anticipado gratuito",
+      "title": "Todo incluido, gratis por ahora",
+      "subtitle": "Estamos en acceso anticipado. Todos los escaneos y el monitoreo continuo son gratis mientras afinamos la plataforma.",
+      "mostPopular": "Más popular",
+      "tiers": [
+        {
+          "title": "Escaneo Básico",
+          "desc": "Verificaciones OWASP esenciales en minutos.",
+          "features": ["Auditoría de cabeceras de seguridad", "Calificación SSL/TLS", "Identificación de tecnologías", "Calificación A–F"],
+          "cta": "Ejecutar escaneo básico"
+        },
+        {
+          "title": "Escaneo Profundo",
+          "desc": "Análisis completo + guía de remediación con IA.",
+          "features": ["Todo lo del escaneo Básico", "Sondeo activo de rutas", "Seguridad de DNS y correo", "Análisis con DeepSeek AI", "Guías de solución paso a paso"],
+          "cta": "Ejecutar escaneo profundo"
+        },
+        {
+          "title": "Monitoreo Continuo",
+          "desc": "Reescaneos automáticos + alertas de CVE.",
+          "features": ["Reescaneos profundos semanales", "Monitoreo diario de feed de CVE", "Alertas instantáneas para tu stack", "Informe completo con IA en cada corrida"],
+          "cta": "Activar monitoreo"
+        }
+      ]
+    }
+  },
+  "scanForm": {
+    "title": "Iniciar escaneo de seguridad",
+    "subtitle": "Pega cualquier URL de acceso público — tu app, el sitio de un cliente, o cualquier sitio en vivo.",
+    "urlLabel": "URL objetivo",
+    "urlPlaceholder": "https://ejemplo.com",
+    "urlHelp": "Funciona con cualquier sitio de acceso público. Solo escanea sitios que tengas permiso de probar.",
+    "depthLabel": "Profundidad del escaneo",
+    "creditsAvailable": "{{count}} crédito disponible",
+    "creditsAvailable_other": "{{count}} créditos disponibles",
+    "recommended": "Recomendado",
+    "selected": "Seleccionado",
+    "select": "Seleccionar",
+    "processing": "Procesando...",
+    "runDeepScan": "Ejecutar escaneo profundo",
+    "runBasicScan": "Ejecutar escaneo básico",
+    "disclaimer": "Solo escanea sitios que te pertenezcan o que tengas permiso explícito de probar.",
+    "tiers": {
+      "basic": {
+        "name": "Escaneo Básico",
+        "desc": "Verificaciones OWASP esenciales y cabeceras",
+        "features": ["Análisis de cabeceras", "Calificación SSL/TLS", "Identificación de tecnologías"]
+      },
+      "deep": {
+        "name": "Escaneo Profundo",
+        "desc": "Análisis completo + informe con IA",
+        "features": ["Todo lo del escaneo Básico", "Análisis de seguridad con IA", "Guía de remediación"]
+      }
+    }
+  }
+}

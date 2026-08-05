@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { useSeo } from "@/lib/seo";
 import { useCreateScan, useGetCredits } from "@workspace/api-client-react";
 import { Shield, Zap, Globe, Lock, CheckCircle2, Loader2 } from "lucide-react";
@@ -17,40 +18,32 @@ function getFriendlyError(err: unknown): string {
   return clean.length > 120 ? clean.slice(0, 120) + "…" : clean;
 }
 
-type TierConfig = {
+interface TierCopy {
   id: ScanTier;
-  name: string;
   desc: string;
   features: string[];
-  popular?: boolean;
-};
-
-const TIERS: TierConfig[] = [
-  {
-    id: "basic",
-    name: "Basic Scan",
-    desc: "Core OWASP checks and headers",
-    features: ["Header analysis", "SSL/TLS grading", "Tech fingerprint"],
-  },
-  {
-    id: "deep",
-    name: "Deep Scan",
-    desc: "Full analysis + AI-powered report",
-    features: ["Everything in Basic", "AI security analysis", "Remediation guide"],
-    popular: true,
-  },
-];
+}
 
 export default function ScanFormPage() {
+  const { t, i18n } = useTranslation();
   useSeo({ title: "New Scan — Seclayer", noindex: true });
   const [url, setUrl] = useState("");
   const [tier, setTier] = useState<ScanTier>("deep");
   const [, setLocation] = useLocation();
 
   const { data: credits, isLoading: loadingCredits } = useGetCredits();
-  const createScan = useCreateScan();
+  // Report language for the AI-generated summary/fix prompt — UI chrome
+  // translation is handled entirely client-side via i18next.
+  const createScan = useCreateScan({
+    request: { headers: { "X-VibeScan-Lang": i18n.language.startsWith("es") ? "es" : "en" } },
+  });
 
-  const selectedTier = TIERS.find((t) => t.id === tier);
+  const tierCopy = t("scanForm.tiers", { returnObjects: true }) as Record<"basic" | "deep", { name: string; desc: string; features: string[] }>;
+  const TIERS: TierCopy[] = [
+    { id: "basic", desc: tierCopy.basic.desc, features: tierCopy.basic.features },
+    { id: "deep", desc: tierCopy.deep.desc, features: tierCopy.deep.features },
+  ];
+  const selectedTier = TIERS.find((tc) => tc.id === tier);
   const hasCredits = credits && credits.balance > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -83,10 +76,10 @@ export default function ScanFormPage() {
           <Shield className="w-8 h-8 text-primary" />
         </div>
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
-          Launch Security Scan
+          {t("scanForm.title")}
         </h1>
         <p className="text-muted-foreground text-lg">
-          Paste any publicly accessible URL — your app, a client's site, or any live website.
+          {t("scanForm.subtitle")}
         </p>
       </div>
 
@@ -95,7 +88,7 @@ export default function ScanFormPage() {
           {/* URL Input */}
           <div className="flex flex-col gap-3">
             <label htmlFor="url" className="text-sm font-semibold flex items-center gap-2">
-              <Globe className="w-4 h-4 text-primary" /> Target URL
+              <Globe className="w-4 h-4 text-primary" /> {t("scanForm.urlLabel")}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -104,7 +97,7 @@ export default function ScanFormPage() {
               <input
                 id="url"
                 type="text"
-                placeholder="https://example.com"
+                placeholder={t("scanForm.urlPlaceholder")}
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 required
@@ -112,7 +105,7 @@ export default function ScanFormPage() {
               />
             </div>
             <p className="text-xs text-muted-foreground ml-1">
-              Any publicly accessible website works. Only scan sites you have permission to test.
+              {t("scanForm.urlHelp")}
             </p>
           </div>
 
@@ -120,65 +113,69 @@ export default function ScanFormPage() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <label className="text-sm font-semibold flex items-center gap-2">
-                <Zap className="w-4 h-4 text-primary" /> Scan Depth
+                <Zap className="w-4 h-4 text-primary" /> {t("scanForm.depthLabel")}
               </label>
 
               {!loadingCredits && hasCredits && (
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full text-xs font-medium text-primary">
                   <Zap className="w-3.5 h-3.5" />
-                  {credits.balance} Credit{credits.balance !== 1 ? "s" : ""} Available
+                  {t("scanForm.creditsAvailable", { count: credits.balance })}
                 </div>
               )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {TIERS.map((t) => (
-                <label
-                  key={t.id}
-                  className={cn(
-                    "relative flex flex-col p-5 rounded-2xl cursor-pointer transition-all border-2",
-                    tier === t.id
-                      ? "bg-primary/5 border-primary shadow-[0_0_20px_rgba(20,184,120,0.15)]"
-                      : "bg-secondary/50 border-white/5 hover:bg-secondary hover:border-white/10",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="tier"
-                    value={t.id}
-                    checked={tier === t.id}
-                    onChange={() => setTier(t.id)}
-                    className="sr-only"
-                  />
-                  {t.popular && (
-                    <span className="absolute -top-3 right-4 px-2 py-0.5 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider rounded-full">
-                      Recommended
-                    </span>
-                  )}
-                  <div className="mb-2">
-                    <div className="font-bold text-lg">{t.name}</div>
-                    <div className="text-sm text-muted-foreground">{t.desc}</div>
-                  </div>
-                  <ul className="mt-4 flex flex-col gap-1.5 flex-1">
-                    {t.features.map((f, i) => (
-                      <li key={i} className="text-xs flex items-center gap-1.5 text-muted-foreground">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-primary/70 shrink-0" /> {f}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div
+              {TIERS.map((tc) => {
+                const name = tc.id === "deep" ? tierCopy.deep.name : tierCopy.basic.name;
+                const popular = tc.id === "deep";
+                return (
+                  <label
+                    key={tc.id}
                     className={cn(
-                      "mt-5 w-full py-2 rounded-lg text-center text-sm font-semibold transition-colors",
-                      tier === t.id
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-white/5 text-muted-foreground",
+                      "relative flex flex-col p-5 rounded-2xl cursor-pointer transition-all border-2",
+                      tier === tc.id
+                        ? "bg-primary/5 border-primary shadow-[0_0_20px_rgba(20,184,120,0.15)]"
+                        : "bg-secondary/50 border-white/5 hover:bg-secondary hover:border-white/10",
                     )}
                   >
-                    {tier === t.id ? "Selected" : "Select"}
-                  </div>
-                </label>
-              ))}
+                    <input
+                      type="radio"
+                      name="tier"
+                      value={tc.id}
+                      checked={tier === tc.id}
+                      onChange={() => setTier(tc.id)}
+                      className="sr-only"
+                    />
+                    {popular && (
+                      <span className="absolute -top-3 right-4 px-2 py-0.5 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider rounded-full">
+                        {t("scanForm.recommended")}
+                      </span>
+                    )}
+                    <div className="mb-2">
+                      <div className="font-bold text-lg">{name}</div>
+                      <div className="text-sm text-muted-foreground">{tc.desc}</div>
+                    </div>
+                    <ul className="mt-4 flex flex-col gap-1.5 flex-1">
+                      {tc.features.map((f, i) => (
+                        <li key={i} className="text-xs flex items-center gap-1.5 text-muted-foreground">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-primary/70 shrink-0" /> {f}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div
+                      className={cn(
+                        "mt-5 w-full py-2 rounded-lg text-center text-sm font-semibold transition-colors",
+                        tier === tc.id
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-white/5 text-muted-foreground",
+                      )}
+                    >
+                      {tier === tc.id ? t("scanForm.selected") : t("scanForm.select")}
+                    </div>
+                  </label>
+                );
+              })}
             </div>
           </div>
 
@@ -191,11 +188,11 @@ export default function ScanFormPage() {
             >
               {createScan.isPending ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" /> Processing...
+                  <Loader2 className="w-5 h-5 animate-spin" /> {t("scanForm.processing")}
                 </>
               ) : (
                 <>
-                  <Zap className="w-5 h-5" /> {selectedTier?.id === "deep" ? "Run Deep Scan" : "Run Basic Scan"}
+                  <Zap className="w-5 h-5" /> {selectedTier?.id === "deep" ? t("scanForm.runDeepScan") : t("scanForm.runBasicScan")}
                 </>
               )}
             </button>
@@ -207,7 +204,7 @@ export default function ScanFormPage() {
             )}
 
             <p className="text-xs text-muted-foreground text-center">
-              Only scan sites you own or have explicit permission to test.
+              {t("scanForm.disclaimer")}
             </p>
           </div>
         </form>

@@ -1,13 +1,18 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSeo } from "@/lib/seo";
 import { useListScans, useGetCredits, useGetScanStatus, getGetScanStatusQueryKey } from "@workspace/api-client-react";
-import { Shield, Plus, Clock, CheckCircle2, AlertCircle, RefreshCw, FileText, Loader2, ArrowRight, Info, Zap as ZapIcon, Bell, AlertTriangle } from "lucide-react";
+import {
+  Shield, Plus, Clock, CheckCircle2, AlertCircle, RefreshCw, FileText, Loader2, ArrowRight, Info,
+  Zap as ZapIcon, Bell, AlertTriangle, Terminal, Copy, Check, Trash2, ChevronDown, ChevronUp, KeyRound,
+} from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { Scan } from "@workspace/api-client-react";
 import { listMonitorSubscriptions } from "@/lib/monitor-api";
+import { listCiApiKeys, createCiApiKey, revokeCiApiKey, type CiApiKey } from "@/lib/ci-api";
+import { useToast } from "@/hooks/use-toast";
 
 const GRADE_COLORS: Record<string, string> = {
   A: "text-emerald-400 bg-emerald-400/10 border-emerald-400/30",
@@ -207,6 +212,178 @@ function GlobeIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function ciActionSnippet(origin: string): string {
+  return `- name: Run VibeScan security gate
+  run: |
+    curl -sf -X POST "${origin}/api/ci/scan" \\
+      -H "Authorization: Bearer \${{ secrets.VIBESCAN_CI_KEY }}" \\
+      -H "Content-Type: application/json" \\
+      -d '{"targetUrl":"https://your-preview-url.com","failOn":"high"}' \\
+      -o vibescan-result.json
+    cat vibescan-result.json
+    passed=$(jq -r '.passed' vibescan-result.json)
+    if [ "$passed" != "true" ]; then
+      echo "::error::VibeScan found blocking issues — $(jq -r '.reportUrl' vibescan-result.json)"
+      exit 1
+    fi`;
+}
+
+function CiIntegrationSection() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [showSetup, setShowSetup] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [revealedToken, setRevealedToken] = useState<string | null>(null);
+  const [copied, setCopied] = useState<"token" | "snippet" | null>(null);
+
+  const { data: keys, isLoading } = useQuery({
+    queryKey: ["ci-api-keys"],
+    queryFn: listCiApiKeys,
+  });
+
+  async function copy(text: string, which: "token" | "snippet") {
+    await navigator.clipboard.writeText(text);
+    setCopied(which);
+    setTimeout(() => setCopied((c) => (c === which ? null : c)), 2000);
+  }
+
+  async function handleCreate() {
+    setCreating(true);
+    try {
+      const created = await createCiApiKey();
+      setRevealedToken(created.token);
+      setShowSetup(true);
+      queryClient.invalidateQueries({ queryKey: ["ci-api-keys"] });
+    } catch {
+      toast({ title: "Failed to create key", description: "Please try again in a moment.", variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleRevoke(key: CiApiKey) {
+    if (!confirm(`Revoke "${key.name}"? Any CI pipeline using it will stop working immediately.`)) return;
+    try {
+      await revokeCiApiKey(key.id);
+      queryClient.invalidateQueries({ queryKey: ["ci-api-keys"] });
+    } catch {
+      toast({ title: "Failed to revoke key", description: "Please try again in a moment.", variant: "destructive" });
+    }
+  }
+
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://seclayer.io";
+
+  return (
+    <div className="glass-panel rounded-2xl p-6 mb-10">
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+            <Terminal className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="font-bold text-lg">CI/CD Integration</h2>
+            <p className="text-sm text-muted-foreground">Gate your pull requests on a VibeScan grade — no dashboard required.</p>
+          </div>
+        </div>
+        <button
+          onClick={handleCreate}
+          disabled={creating}
+          className="flex items-center gap-1.5 px-4 py-2 bg-primary/10 border border-primary/20 hover:bg-primary/20 text-primary text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+        >
+          {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+          New CI Key
+        </button>
+      </div>
+
+      {revealedToken && (
+        <div className="mb-4 p-4 rounded-xl bg-amber-400/10 border border-amber-400/25">
+          <p className="text-xs font-semibold text-amber-400 mb-2">
+            Copy this key now — it won't be shown again.
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 min-w-0 truncate text-xs bg-background/60 rounded-lg px-3 py-2 font-mono">
+              {revealedToken}
+            </code>
+            <button
+              onClick={() => copy(revealedToken, "token")}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-secondary hover:bg-white/10 rounded-lg text-xs font-medium transition-colors"
+            >
+              {copied === "token" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied === "token" ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <button
+            onClick={() => setRevealedToken(null)}
+            className="text-xs text-muted-foreground hover:text-foreground mt-2 underline underline-offset-4"
+          >
+            I've saved it — dismiss
+          </button>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading keys…
+        </div>
+      ) : keys && keys.length > 0 ? (
+        <div className="space-y-2 mb-4">
+          {keys.map((key) => (
+            <div key={key.id} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary/40 border border-white/5">
+              <KeyRound className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium truncate">{key.name}</div>
+                <div className="text-xs text-muted-foreground font-mono">
+                  {key.tokenPrefix}… · {key.lastUsedAt ? `last used ${format(new Date(key.lastUsedAt), "MMM d, yyyy")}` : "never used"}
+                </div>
+              </div>
+              <button
+                onClick={() => handleRevoke(key)}
+                className="shrink-0 p-2 rounded-lg hover:bg-red-400/10 text-muted-foreground hover:text-red-400 transition-colors"
+                title="Revoke key"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground mb-4">No CI keys yet — create one to start gating pull requests on a scan grade.</p>
+      )}
+
+      <button
+        onClick={() => setShowSetup((s) => !s)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {showSetup ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        {showSetup ? "Hide" : "Show"} setup instructions
+      </button>
+
+      {showSetup && (
+        <div className="mt-4 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Add your key as a repo secret named <code className="px-1 py-0.5 bg-secondary rounded">VIBESCAN_CI_KEY</code>, then add this step to any GitHub Actions workflow (works the same in any CI system via plain <code className="px-1 py-0.5 bg-secondary rounded">curl</code>):
+          </p>
+          <div className="relative">
+            <pre className="text-xs bg-background/60 border border-white/10 rounded-xl p-4 overflow-x-auto font-mono leading-relaxed">
+              {ciActionSnippet(origin)}
+            </pre>
+            <button
+              onClick={() => copy(ciActionSnippet(origin), "snippet")}
+              className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 bg-secondary hover:bg-white/10 rounded-lg text-xs font-medium transition-colors"
+            >
+              {copied === "snippet" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied === "snippet" ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            <code className="px-1 py-0.5 bg-secondary rounded">failOn</code> can be <code className="px-1 py-0.5 bg-secondary rounded">critical</code>, <code className="px-1 py-0.5 bg-secondary rounded">high</code>, <code className="px-1 py-0.5 bg-secondary rounded">medium</code>, or <code className="px-1 py-0.5 bg-secondary rounded">never</code> (report only, never fail the build).
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   useSeo({ title: "Dashboard — Seclayer", noindex: true });
   const params = new URLSearchParams(
@@ -320,6 +497,8 @@ export default function DashboardPage() {
           </div>
         </Link>
       </div>
+
+      <CiIntegrationSection />
 
       {/* Scan table */}
       <div className="glass-panel rounded-2xl overflow-hidden">

@@ -1,8 +1,29 @@
 import { type Request, type Response, type NextFunction } from "express";
 import type { AuthUser } from "@workspace/api-zod";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, ciApiKeysTable } from "@workspace/db";
+import { eq, and, isNull } from "drizzle-orm";
 import { getSession } from "../lib/auth";
+import { looksLikeCiApiKey, hashCiApiKey } from "../lib/ciApiKeys";
+
+/** Looks up the owning userId for a valid, non-revoked CI key. Updates lastUsedAt as a side effect. */
+async function resolveCiApiKey(token: string): Promise<string | null> {
+  const tokenHash = hashCiApiKey(token);
+
+  const [key] = await db
+    .select({ id: ciApiKeysTable.id, userId: ciApiKeysTable.userId })
+    .from(ciApiKeysTable)
+    .where(and(eq(ciApiKeysTable.tokenHash, tokenHash), isNull(ciApiKeysTable.revokedAt)));
+
+  if (!key) return null;
+
+  // Fire-and-forget — a missed lastUsedAt update should never block the request
+  db.update(ciApiKeysTable)
+    .set({ lastUsedAt: new Date() })
+    .where(eq(ciApiKeysTable.id, key.id))
+    .catch(() => {});
+
+  return key.userId;
+}
 
 declare global {
   namespace Express {
@@ -54,6 +75,30 @@ export async function authMiddleware(
   }
 
   const token = authHeader.slice(7).trim();
+
+  // ── 2a. CI/CD API key (long-lived, tied to an existing user) ─────────────
+  if (looksLikeCiApiKey(token)) {
+    try {
+      const userId = await resolveCiApiKey(token);
+      if (userId) {
+        const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+        if (dbUser) {
+          req.user = {
+            id: dbUser.id,
+            email: dbUser.email,
+            firstName: dbUser.firstName,
+            lastName: dbUser.lastName,
+            profileImageUrl: dbUser.profileImageUrl,
+          };
+        }
+      }
+    } catch {
+      // non-fatal — proceed unauthenticated
+    }
+    next();
+    return;
+  }
+
   if (!UUID_V4.test(token)) {
     next();
     return;

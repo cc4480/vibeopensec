@@ -115,6 +115,16 @@ const CATEGORY_META: Record<string, CategoryMeta> = {
 };
 
 // Maps a WSTG ID like "WSTG-CONF-07" to its OWASP Testing Guide URL path fragment
+// Verified against the live OWASP site + github.com/OWASP/wstg on 2026-08-04 —
+// several entries here were previously wrong (stale folder-naming guesses that
+// predate OWASP's current "<Category>_Testing" folder scheme, plus one outright
+// ID typo: WSTG-ATHZ-01 was keyed as "WSTG-AUTHZ-01", so every scanner-emitted
+// Authorization finding — including the Supabase/Firebase RLS probes — missed
+// the map and fell through to an empty path. Re-verify with the README.md in
+// each document/4-Web_Application_Security_Testing/<Category>/ folder if a
+// probe starts emitting a new WSTG ID; the file's numeric prefix does NOT
+// reliably match the WSTG-<CAT>-<N> id (categories have had tests inserted
+// over time without renumbering, e.g. WSTG-ATHZ-05.1).
 const WSTG_PATHS: Record<string, string> = {
   "WSTG-CONF-02": "02-Configuration_and_Deployment_Management_Testing/02-Test_Application_Platform_Configuration",
   "WSTG-CONF-04": "02-Configuration_and_Deployment_Management_Testing/04-Review_Old_Backup_and_Unreferenced_Files_for_Sensitive_Information",
@@ -126,18 +136,21 @@ const WSTG_PATHS: Record<string, string> = {
   "WSTG-CRYP-01": "09-Testing_for_Weak_Cryptography/01-Testing_for_Weak_Transport_Layer_Security",
   "WSTG-INFO-01": "01-Information_Gathering/01-Conduct_Search_Engine_Discovery_Reconnaissance_for_Information_Leakage",
   "WSTG-INFO-02": "01-Information_Gathering/02-Fingerprint_Web_Server",
-  "WSTG-INFO-09": "01-Information_Gathering/09-Fingerprint_Web_Application_Framework",
-  "WSTG-CLNT-01": "11-Client-Side_Testing/01-Testing_for_DOM-Based_Cross_Site_Scripting",
-  "WSTG-CLNT-04": "11-Client-Side_Testing/04-Testing_for_Client-Side_URL_Redirect",
-  "WSTG-CLNT-09": "11-Client-Side_Testing/09-Testing_for_Clickjacking",
-  "WSTG-SESS-02": "06-Testing_for_Session_Management/02-Testing_for_Cookies_Attributes",
-  "WSTG-SESS-10": "06-Testing_for_Session_Management/10-Testing_JSON_Web_Tokens",
-  "WSTG-ATHN-03": "04-Testing_for_Authentication/03-Testing_for_Weak_Lock_Out_Mechanism",
-  "WSTG-AUTHZ-01": "05-Testing_for_Authorization/01-Testing_Directory_Traversal_File_Include",
+  "WSTG-INFO-09": "01-Information_Gathering/09-Fingerprint_Web_Application",
+  "WSTG-CLNT-01": "11-Client-side_Testing/01-Testing_for_DOM-based_Cross_Site_Scripting",
+  "WSTG-CLNT-04": "11-Client-side_Testing/04-Testing_for_Client-side_URL_Redirect",
+  "WSTG-CLNT-09": "11-Client-side_Testing/09-Testing_for_Clickjacking",
+  "WSTG-SESS-02": "06-Session_Management_Testing/02-Testing_for_Cookies_Attributes",
+  "WSTG-SESS-10": "06-Session_Management_Testing/10-Testing_JSON_Web_Tokens",
+  "WSTG-ATHN-03": "04-Authentication_Testing/03-Testing_for_Weak_Lock_Out_Mechanism",
+  "WSTG-ATHZ-01": "05-Authorization_Testing/01-Testing_Directory_Traversal_File_Include",
 };
 
-function wstgCategoryPath(id: string): string {
-  return WSTG_PATHS[id] ?? "";
+// Returns null (not a guessed/empty path) when the id isn't mapped, so callers
+// can skip rendering a link entirely rather than pointing at the generic WSTG
+// landing page under a specific-looking badge.
+function wstgCategoryPath(id: string): string | null {
+  return WSTG_PATHS[id] ?? null;
 }
 
 function getCategoryMeta(category: string): CategoryMeta {
@@ -444,13 +457,19 @@ function VulnCard({
                         </span>
                       )}
                       {vuln.wstgId && (
-                        <a
-                          href={`https://owasp.org/www-project-web-security-testing-guide/stable/4-Web_Application_Security_Testing/${wstgCategoryPath(vuln.wstgId)}`}
-                          target="_blank" rel="noreferrer"
-                          className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded hover:bg-secondary/80 transition-colors"
-                        >
-                          {vuln.wstgId}
-                        </a>
+                        wstgCategoryPath(vuln.wstgId) ? (
+                          <a
+                            href={`https://owasp.org/www-project-web-security-testing-guide/stable/4-Web_Application_Security_Testing/${wstgCategoryPath(vuln.wstgId)}`}
+                            target="_blank" rel="noreferrer"
+                            className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded hover:bg-secondary/80 transition-colors"
+                          >
+                            {vuln.wstgId}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded">
+                            {vuln.wstgId}
+                          </span>
+                        )
                       )}
                       {vuln.confidence != null && (
                         <span
@@ -1786,6 +1805,7 @@ interface ShareLink {
 function ShareButton({ reportId }: { reportId: string }) {
   const [open, setOpen] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [copiedBadgeToken, setCopiedBadgeToken] = useState<string | null>(null);
   const [expiresIn, setExpiresIn] = useState<"7d" | "30d" | "never">("never");
   const queryClient = useQueryClient();
 
@@ -1821,6 +1841,19 @@ function ShareButton({ reportId }: { reportId: string }) {
     }
     setCopiedToken(token);
     setTimeout(() => setCopiedToken(null), 2000);
+  };
+
+  const copyBadge = async (token: string) => {
+    const badgeUrl = `${window.location.origin}/api/badge/${token}.svg`;
+    const shareUrl = `${window.location.origin}/share/${token}`;
+    const markdown = `[![VibeScan Grade](${badgeUrl})](${shareUrl})`;
+    try {
+      await navigator.clipboard.writeText(markdown);
+    } catch {
+      prompt("Copy this badge markdown:", markdown);
+    }
+    setCopiedBadgeToken(token);
+    setTimeout(() => setCopiedBadgeToken(null), 2000);
   };
 
   const handleCreate = () => {
@@ -1949,6 +1982,18 @@ function ShareButton({ reportId }: { reportId: string }) {
                             {copiedToken === share.token ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>
                           <button
+                            onClick={() => void copyBadge(share.token)}
+                            title="Copy grade badge (Markdown)"
+                            className={cn(
+                              "shrink-0 px-2 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
+                              copiedBadgeToken === share.token
+                                ? "bg-emerald-500/20 text-emerald-400"
+                                : "hover:bg-white/10 text-muted-foreground hover:text-foreground",
+                            )}
+                          >
+                            {copiedBadgeToken === share.token ? "Copied" : "Badge"}
+                          </button>
+                          <button
                             onClick={() => handleRevoke(share.token)}
                             disabled={revoking}
                             title="Revoke link"
@@ -1966,7 +2011,7 @@ function ShareButton({ reportId }: { reportId: string }) {
 
             {/* Footer note */}
             <div className="px-5 pb-4 text-xs text-muted-foreground/50">
-              Recipients can view the report and download a PDF — they cannot modify findings or access your account.
+              Recipients can view the report and download a PDF — they cannot modify findings or access your account. "Badge" copies a Markdown grade badge you can embed in a README or landing page.
             </div>
           </div>
         </div>
@@ -2440,7 +2485,10 @@ export default function ReportViewer() {
           {/* Accuracy bar */}
           {filteredVulns.length > 0 && (
             <div className="flex items-center gap-4 p-3 rounded-xl bg-secondary/40 border border-white/5 text-xs">
-              <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
+              <div
+                className="flex items-center gap-1.5 text-emerald-400 font-medium"
+                title="Confirmed findings required live behavioral evidence — real data returned, real request succeeded — not just a pattern match"
+              >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>{confirmedVulns.length} confirmed</span>
               </div>
@@ -2716,7 +2764,7 @@ export default function ReportViewer() {
         <div className="flex-1 text-center sm:text-left">
           <h3 className="font-bold text-lg mb-1">Keep watching this URL</h3>
           <p className="text-sm text-muted-foreground">
-            Weekly automated rescans + instant CVE alerts when new vulnerabilities match your tech stack. <span className="text-indigo-400 font-semibold">$129/yr</span>
+            Weekly automated rescans + instant CVE alerts when new vulnerabilities match your tech stack. <span className="text-indigo-400 font-semibold">Free during early access</span>
           </p>
         </div>
         <Link

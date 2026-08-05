@@ -13,6 +13,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { ScanVulnerability } from "./scanner";
+import { shannonEntropy } from "./secret-pattern-data";
 
 const PAGE_TIMEOUT_MS = 8_000;
 const CRAWL_TIMEOUT_MS = 30_000;
@@ -82,6 +83,92 @@ export function extractInternalLinks(html: string, baseUrl: string): string[] {
 
   // Return as full URLs (high-value path probing is handled separately in crawlAndCheck)
   return [...seen].map((path) => `${base.origin}${path}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// URL-EMBEDDED SECRET DETECTION
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Query-string parameter names strongly associated with a durable, third-party
+// API credential. Deliberately excludes generic session/CSRF/reset-flow token
+// names ("token", "session", "csrf") — those are commonly and legitimately
+// passed in URLs by design (password reset links, email verification,
+// unsubscribe links), and flagging them would be a false-positive magnet.
+const CREDENTIAL_PARAM_NAMES = new Set([
+  "apikey", "api-key", "api_key", "x-api-key",
+  "clientsecret", "client_secret",
+  "secretkey", "secret_key",
+  "accesstoken", "access_token",
+]);
+
+// Paths that legitimately carry a single-use token by design — never flag
+// these even if a param name would otherwise match.
+const BENIGN_TOKEN_PATH_PATTERNS = /reset.?password|verify.?email|confirm|unsubscribe|invite|magic.?link|auth\/callback/i;
+
+const PLACEHOLDER_VALUE = /^(?:YOUR_|EXAMPLE|PLACEHOLDER|xxx+|<|\{\{|\*{3,}|\.{3,}|undefined|null|test)/i;
+
+function redact(value: string): string {
+  return value.length <= 8 ? "***" : `${value.slice(0, 4)}...${value.slice(-4)}`;
+}
+
+/**
+ * Scans a page's <a href>/<form action> attributes and inline <script> content
+ * for API credentials embedded directly in URL query strings. URL-embedded
+ * secrets are written to server access logs, browser history, and any
+ * third-party service the page sends a Referer header to (analytics, CDNs,
+ * ad networks) — a distinct exposure path from a hardcoded JS variable.
+ */
+export function checkUrlEmbeddedSecrets(html: string, baseUrl: string): ScanVulnerability[] {
+  const candidates = new Set<string>();
+
+  const attrRegex = /(?:href|action)=["']([^"']+\?[^"']+)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = attrRegex.exec(html)) !== null) candidates.add(m[1]!);
+
+  const scriptRegex = /<script(?:[^>]*)>([\s\S]*?)<\/script>/gi;
+  while ((m = scriptRegex.exec(html)) !== null) {
+    const scriptBody = m[1] ?? "";
+    const urlLiteralRegex = /["'`](https?:\/\/[^"'`\s]+\?[^"'`\s]+|\/[^"'`\s]*\?[^"'`\s]+)["'`]/g;
+    let sm: RegExpExecArray | null;
+    while ((sm = urlLiteralRegex.exec(scriptBody)) !== null) candidates.add(sm[1]!);
+  }
+
+  const found = new Map<string, ScanVulnerability>();
+
+  for (const raw of candidates) {
+    let url: URL;
+    try { url = new URL(raw, baseUrl); } catch { continue; }
+    if (BENIGN_TOKEN_PATH_PATTERNS.test(url.pathname)) continue;
+
+    for (const [key, value] of url.searchParams.entries()) {
+      const normalizedKey = key.toLowerCase().replace(/[\s_-]/g, "");
+      if (!CREDENTIAL_PARAM_NAMES.has(normalizedKey)) continue;
+      if (!value || value.length < 12) continue;
+      if (PLACEHOLDER_VALUE.test(value)) continue;
+      if (shannonEntropy(value) < 3.0) continue;
+      if (found.has(key.toLowerCase())) continue;
+
+      const redactedUrl = raw.replaceAll(value, redact(value));
+
+      found.set(key.toLowerCase(), vuln({
+        name: "API Credential Exposed in URL Query String",
+        severity: "high",
+        category: "Information Disclosure",
+        description:
+          `A URL parameter named "${key}" carries a value that looks like a live API credential, found in a link or script on this page. ` +
+          "Secrets embedded in URLs are written to server access logs, browser history, and the Referer header sent to any third-party service the page loads (analytics, CDNs, ad networks) — " +
+          "a distinct, wider exposure path than a hardcoded JavaScript variable.",
+        evidence: `Found in: ${redactedUrl.length > 140 ? `${redactedUrl.slice(0, 140)}…` : redactedUrl}\nParameter: ${key}=${redact(value)}`,
+        solution:
+          "Move this credential server-side. If the request must originate from the browser, exchange it for a short-lived, scoped token issued by your backend and send it in an Authorization header instead of the URL — headers aren't written to access logs or Referer headers the way URLs are.",
+        cweId: "CWE-598",
+        cvssScore: 7.5,
+        wstgId: "WSTG-CONF-04",
+      }));
+    }
+  }
+
+  return [...found.values()];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
