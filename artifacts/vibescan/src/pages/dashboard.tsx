@@ -5,7 +5,7 @@ import { useSeo } from "@/lib/seo";
 import { useListScans, useGetCredits, useGetScanStatus, getGetScanStatusQueryKey } from "@workspace/api-client-react";
 import {
   Shield, Plus, Clock, CheckCircle2, AlertCircle, RefreshCw, FileText, Loader2, ArrowRight, Info,
-  Zap as ZapIcon, Bell, AlertTriangle, Terminal, Copy, Check, Trash2, ChevronDown, ChevronUp, KeyRound,
+  Zap as ZapIcon, Bell, AlertTriangle, Terminal, Copy, Check, Trash2, ChevronDown, ChevronUp, KeyRound, Bot,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -228,20 +228,35 @@ function ciActionSnippet(origin: string): string {
     fi`;
 }
 
+function mcpConfigSnippet(origin: string): string {
+  return `{
+  "mcpServers": {
+    "vibescan": {
+      "type": "http",
+      "url": "${origin}/api/mcp",
+      "headers": {
+        "Authorization": "Bearer <YOUR_CI_KEY>"
+      }
+    }
+  }
+}`;
+}
+
 function CiIntegrationSection() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [showSetup, setShowSetup] = useState(false);
+  const [showMcpSetup, setShowMcpSetup] = useState(false);
   const [creating, setCreating] = useState(false);
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
-  const [copied, setCopied] = useState<"token" | "snippet" | null>(null);
+  const [copied, setCopied] = useState<"token" | "snippet" | "mcp" | null>(null);
 
   const { data: keys, isLoading } = useQuery({
     queryKey: ["ci-api-keys"],
     queryFn: listCiApiKeys,
   });
 
-  async function copy(text: string, which: "token" | "snippet") {
+  async function copy(text: string, which: "token" | "snippet" | "mcp") {
     await navigator.clipboard.writeText(text);
     setCopied(which);
     setTimeout(() => setCopied((c) => (c === which ? null : c)), 2000);
@@ -377,6 +392,40 @@ function CiIntegrationSection() {
           </div>
           <p className="text-xs text-muted-foreground">
             <code className="px-1 py-0.5 bg-secondary rounded">failOn</code> can be <code className="px-1 py-0.5 bg-secondary rounded">critical</code>, <code className="px-1 py-0.5 bg-secondary rounded">high</code>, <code className="px-1 py-0.5 bg-secondary rounded">medium</code>, or <code className="px-1 py-0.5 bg-secondary rounded">never</code> (report only, never fail the build).
+          </p>
+        </div>
+      )}
+
+      <button
+        onClick={() => setShowMcpSetup((s) => !s)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-3"
+      >
+        {showMcpSetup ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        {showMcpSetup ? "Hide" : "Show"} AI agent (MCP) setup
+      </button>
+
+      {showMcpSetup && (
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Bot className="w-3.5 h-3.5 shrink-0" />
+            <p>
+              Connect Claude Code, Cursor, or any MCP-compatible agent so it can scan mid-build — a full graded scan, a few-second Supabase/Firebase/PocketBase/Appwrite open-access check, and report lookup, all callable from inside your editor. Same CI key as above; swap <code className="px-1 py-0.5 bg-secondary rounded">&lt;YOUR_CI_KEY&gt;</code> for the value you copied.
+            </p>
+          </div>
+          <div className="relative">
+            <pre className="text-xs bg-background/60 border border-white/10 rounded-xl p-4 overflow-x-auto font-mono leading-relaxed">
+              {mcpConfigSnippet(origin)}
+            </pre>
+            <button
+              onClick={() => copy(mcpConfigSnippet(origin), "mcp")}
+              className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 bg-secondary hover:bg-white/10 rounded-lg text-xs font-medium transition-colors"
+            >
+              {copied === "mcp" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied === "mcp" ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Save this as <code className="px-1 py-0.5 bg-secondary rounded">.mcp.json</code> in your project (Claude Code / Cursor) or your client's MCP config location. Ask your agent to "check my Supabase RLS with VibeScan" or "run a VibeScan scan on this URL" once connected.
           </p>
         </div>
       )}

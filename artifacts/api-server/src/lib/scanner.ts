@@ -251,8 +251,20 @@ function analyzeCookies(setCookieHeader: string | undefined): ScanVulnerability[
   return findings;
 }
 
-export async function runScan(targetUrl: string, tier: string): Promise<ScanResult> {
-  const startedAt = Date.now();
+export interface FetchedTarget {
+  html: string;
+  finalUrl: string;
+  rawHeaders: Record<string, string>;
+  status: number;
+}
+
+/**
+ * Fetches a target URL with the scanner's standard identifying UA, no-cache
+ * headers, and abort timeout. Shared by the full scan pipeline (runScan) and
+ * any lightweight probe that needs the same page fetch without the rest of
+ * the pipeline (e.g. an on-demand BaaS-only check).
+ */
+export async function fetchTargetHtml(targetUrl: string): Promise<FetchedTarget> {
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -286,6 +298,14 @@ export async function runScan(targetUrl: string, tier: string): Promise<ScanResu
   response.headers.forEach((val, key) => {
     rawHeaders[key] = val;
   });
+
+  return { html, finalUrl, rawHeaders, status: response.status };
+}
+
+export async function runScan(targetUrl: string, tier: string): Promise<ScanResult> {
+  const startedAt = Date.now();
+
+  const { html, finalUrl, rawHeaders, status } = await fetchTargetHtml(targetUrl);
 
   const isHttps = finalUrl.startsWith("https://");
   const tlsGrade = isHttps ? "A" : null;
@@ -744,7 +764,7 @@ export async function runScan(targetUrl: string, tier: string): Promise<ScanResu
   return {
     targetUrl,
     finalUrl,
-    statusCode: response.status,
+    statusCode: status,
     server,
     tlsGrade,
     technologies,

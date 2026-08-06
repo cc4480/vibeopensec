@@ -10,6 +10,7 @@ import dismissalsRouter from "./dismissals";
 import sharesRouter from "./shares";
 import ciKeysRouter from "./ciKeys";
 import ciRouter from "./ci";
+import mcpRouter from "./mcp";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(dismissalsRouter);
 router.use(sharesRouter);
 router.use(ciKeysRouter);
 router.use(ciRouter);
+router.use(mcpRouter);
 
 export default router;
