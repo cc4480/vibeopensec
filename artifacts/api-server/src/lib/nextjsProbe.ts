@@ -51,7 +51,12 @@ const NEXT_DATA_SECRET_PATTERNS: NextDataSecretPattern[] = [
   },
   {
     name: "Supabase Service Role Key in __NEXT_DATA__",
-    pattern: /service_role[^"']{0,20}["']eyJ[A-Za-z0-9_-]{30,}/,
+    // Matches both a JS-assignment shape (service_role_key = "eyJ...") and the
+    // JSON key:value shape __NEXT_DATA__ actually normalizes to after
+    // JSON.stringify(JSON.parse(...)) — "service_role_key":"eyJ... — which has
+    // a closing-key-quote + colon + opening-value-quote between the key name
+    // and the value, not just one quote character.
+    pattern: /service_role[^"']{0,20}["']\s*:?\s*["']?\s*eyJ[A-Za-z0-9_-]{30,}/,
     severity: "critical", cvssScore: 9.8, cweId: "CWE-312",
     description:
       "A Supabase service_role key was found in __NEXT_DATA__. This key bypasses all Row Level " +

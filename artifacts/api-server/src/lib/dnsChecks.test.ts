@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { checkSpf, checkDmarc } from "./dnsChecks.js";
+import { checkSpf, checkDmarc, checkDkim, checkDnssec } from "./dnsChecks.js";
 
 /**
  * DNS check tests — stubs globalThis.fetch to simulate Cloudflare DoH responses.
@@ -153,5 +153,60 @@ describe("checkDmarc — policy enforcement", () => {
     );
     const vulns = await checkDmarc("example.com");
     expect(vulns.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ─── checkDkim ────────────────────────────────────────────────────────────────
+// Probes ~30 common selectors in parallel — mock covers every fetch call.
+
+describe("checkDkim", () => {
+  it("reports 'No DKIM Records Found' when every selector returns empty (but NOERROR)", async () => {
+    vi.mocked(fetch).mockResolvedValue(dohResponse([]));
+    const vulns = await checkDkim("example.com");
+    expect(vulns).toHaveLength(1);
+    expect(vulns[0]!.severity).toBe("low");
+    expect(vulns[0]!.name).toMatch(/no dkim records found/i);
+  });
+
+  it("returns no vulns when at least one selector resolves to a DKIM record", async () => {
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("default._domainkey")) {
+        return Promise.resolve(dohResponse([{ data: "v=DKIM1; k=rsa; p=MIGfMA0GCSq..." }]));
+      }
+      return Promise.resolve(dohResponse([]));
+    });
+    const vulns = await checkDkim("example.com");
+    expect(vulns).toHaveLength(0);
+  });
+
+  it("returns no vulns when every selector query fails (no basis for a finding)", async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error("network error"));
+    const vulns = await checkDkim("example.com");
+    expect(vulns).toEqual([]);
+  });
+});
+
+// ─── checkDnssec ──────────────────────────────────────────────────────────────
+
+describe("checkDnssec", () => {
+  it("reports 'DNSSEC Not Enabled' (info) when no DNSKEY records exist", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(dohResponse([]));
+    const vulns = await checkDnssec("example.com");
+    expect(vulns).toHaveLength(1);
+    expect(vulns[0]!.severity).toBe("info");
+    expect(vulns[0]!.name).toMatch(/dnssec not enabled/i);
+  });
+
+  it("returns no vulns when DNSKEY records are present", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      dohResponse([{ data: "256 3 13 mdsswUyr3DPW132mOi8V9xESWE8jTo0dxCjjnopKl+GqJxpVXckHAeF+KkxLbxILfDLUT0rAK9iUzy1L53eKGQ==" }]),
+    );
+    expect(await checkDnssec("example.com")).toHaveLength(0);
+  });
+
+  it("returns empty array on network failure (status -1)", async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error("network error"));
+    expect(await checkDnssec("example.com")).toEqual([]);
   });
 });
