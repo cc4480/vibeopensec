@@ -690,9 +690,11 @@ export async function runScan(targetUrl: string, tier: string): Promise<ScanResu
   // introduced its own XSS vulnerabilities in some browsers. Setting it to 0 is correct.
 
   // ── Cache-Control on sensitive-looking pages ───────────────────────────
+  // Not gated on isHttps — unlike mixed content (which is HTTPS-only by
+  // definition), missing cache directives are just as relevant on plain HTTP.
   const cacheControl = headerVal(rawHeaders, "cache-control");
   const pragma = headerVal(rawHeaders, "pragma");
-  if (isHttps && !cacheControl && !pragma) {
+  if (!cacheControl && !pragma) {
     vulnerabilities.push(vuln({
       name: "Missing Cache-Control Headers",
       severity: "info",

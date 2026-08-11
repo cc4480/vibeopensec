@@ -219,51 +219,14 @@ export const SENSITIVE_PATHS: SensitivePath[] = [
   },
 
   // ── API documentation ─────────────────────────────────────────────────────
-  {
-    path: "/swagger.json",
-    name: "API Documentation Exposed (Swagger)",
-    severity: "medium", cweId: "CWE-200", cvssScore: 5.3,
-    category: "Information Disclosure",
-    description: "Swagger/OpenAPI documentation is publicly accessible without authentication. This gives attackers a complete blueprint of every API endpoint, required parameters, authentication schemes, and data models.",
-    solution: "Require authentication to access API docs in production. Add middleware to protect /swagger.json and /swagger-ui.html, or serve docs only on internal network.",
-    validate: (body) => /"swagger"|"openapi"/.test(body.slice(0, 500)),
-  },
-  {
-    path: "/openapi.json",
-    name: "API Documentation Exposed (OpenAPI)",
-    severity: "medium", cweId: "CWE-200", cvssScore: 5.3,
-    category: "Information Disclosure",
-    description: "OpenAPI documentation is publicly accessible, providing a complete map of your API surface.",
-    solution: "Restrict API docs to authenticated users or internal network access.",
-    validate: (body) => /"openapi"|"swagger"/.test(body.slice(0, 500)),
-  },
-  {
-    path: "/swagger-ui.html",
-    name: "Swagger UI Exposed",
-    severity: "medium", cweId: "CWE-200", cvssScore: 5.3,
-    category: "Information Disclosure",
-    description: "Swagger UI is publicly accessible, allowing anyone to browse, test, and interact with your API directly from their browser.",
-    solution: "Require authentication to access Swagger UI in production environments.",
-    validate: (body) => /swagger-ui|SwaggerUI/i.test(body),
-  },
-  {
-    path: "/api-docs",
-    name: "API Documentation Exposed",
-    severity: "medium", cweId: "CWE-200", cvssScore: 5.3,
-    category: "Information Disclosure",
-    description: "API documentation is publicly accessible.",
-    solution: "Restrict API documentation to authenticated users.",
-    validate: (body) => /"swagger"|"openapi"|"paths"/.test(body.slice(0, 1000)),
-  },
-  {
-    path: "/graphql",
-    name: "GraphQL Introspection Exposed",
-    severity: "medium", cweId: "CWE-200", cvssScore: 5.3,
-    category: "Information Disclosure",
-    description: "A GraphQL endpoint appears accessible. If introspection is enabled, attackers can enumerate your entire schema including all queries, mutations, types, and fields.",
-    solution: "Disable GraphQL introspection in production environments. Add depth limiting and query complexity analysis to prevent abuse.",
-    validate: (body) => /\"__schema\"|\"__type\"|graphql|GraphQL/i.test(body),
-  },
+  // /swagger.json, /openapi.json, /swagger-ui.html, /api-docs, and /graphql are
+  // intentionally NOT here — apiDocsProbe.ts and graphqlProbe.ts already cover
+  // these exact paths with much stricter validation (SPA catch-all suppression,
+  // structural spec checks, POST-based introspection confirmation instead of a
+  // loose body-substring match). Keeping both would double-report the same
+  // finding under two different names — the same reasoning that trimmed
+  // baasProbes.ts's overlap with supabase-probes.ts/firebase-probes.ts.
+  // Only the paths those modules don't already probe stay here.
 
   // ── Spring Boot Actuator ─────────────────────────────────────────────────
   {

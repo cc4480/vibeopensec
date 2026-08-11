@@ -102,17 +102,7 @@ describe("SENSITIVE_PATHS: /backup.sql", () => {
     expect(validate("", "text/plain")).toBe(false));
 });
 
-// ─── /api-docs (Swagger) ──────────────────────────────────────────────────────
-
-describe("SENSITIVE_PATHS: /swagger.json", () => {
-  const validate = probeByPath("/swagger.json");
-
-  it("matches a Swagger 2.0 document", () =>
-    expect(validate(`{"swagger":"2.0","paths":{}}`, "application/json")).toBe(true));
-  it("matches an OpenAPI 3 document", () =>
-    expect(validate(`{"openapi":"3.0.0","paths":{}}`, "application/json")).toBe(true));
-  it("rejects an empty JSON object", () =>
-    expect(validate("{}", "application/json")).toBe(false));
-  it("rejects HTML", () =>
-    expect(validate("<html>Not found</html>", "text/html")).toBe(false));
-});
+// /swagger.json, /openapi.json, /swagger-ui.html, /api-docs, and /graphql were
+// removed from SENSITIVE_PATHS (see the comment in probes-data.ts) — that
+// validation now lives solely in apiDocsProbe.ts / graphqlProbe.ts, so the
+// coverage for those paths belongs there, not here.
