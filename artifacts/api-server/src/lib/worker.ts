@@ -127,13 +127,13 @@ async function processScanJob(job: ScanJob): Promise<void> {
   // Wait for SSL Labs (it was started in parallel with the header scan)
   log.info("Waiting for SSL Labs assessment to complete");
   const sslLabsResult = await sslLabsPromise;
-  if (sslLabsResult) {
+  if (sslLabsResult?.grade) {
     log.info({ grade: sslLabsResult.grade, issues: sslLabsResult.issues.length }, "SSL Labs assessment complete");
     // Override the basic TLS grade with the real SSL Labs grade
     scanResult.tlsGrade = sslLabsResult.grade;
 
     // Add SSL Labs findings as vulnerabilities
-    if (sslLabsResult.grade && /^[C-F]$/.test(sslLabsResult.grade)) {
+    if (/^[C-F]$/.test(sslLabsResult.grade)) {
       scanResult.vulnerabilities.push({
         id: randomUUID(),
         name: `Weak TLS Configuration (SSL Labs Grade: ${sslLabsResult.grade})`,
@@ -146,6 +146,13 @@ async function processScanJob(job: ScanJob): Promise<void> {
         cvssScore: sslLabsResult.grade === "F" ? 9.1 : sslLabsResult.grade === "D" ? 7.5 : 5.3,
       } satisfies ScanVulnerability);
     }
+  } else if (sslLabsResult) {
+    // SSL Labs returned status: READY but the endpoint itself never produced a
+    // grade (e.g. an in-progress endpoint-level failure like "Unexpected
+    // failure" at <100% progress) — a real, observed SSL Labs API behavior,
+    // not just a timeout. Falls back to scanner.ts's basic isHttps ? "A" : null
+    // default rather than treating "no grade" as "downgrade to null".
+    log.warn({ issues: sslLabsResult.issues }, "SSL Labs assessment completed without a grade — using basic TLS detection");
   } else {
     log.warn("SSL Labs assessment not available — using basic TLS detection");
   }
