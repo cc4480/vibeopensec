@@ -227,10 +227,16 @@ export async function checkDkim(hostname: string): Promise<ScanVulnerability[]> 
   const foundAny = results.some(
     (r) => r.status === "fulfilled" && r.value.answers.length > 0,
   );
-  // Only report if at least one query returned a valid DNS response (status 0).
-  // If ALL queries timed out / errored, we have no basis for a finding.
+  // Only report if at least one query returned a real DNS response (status
+  // !== -1). Matches checkSpf/checkDmarc's guard — NXDOMAIN (status 3) is a
+  // valid, common answer for a selector subdomain that was simply never
+  // created (the normal shape of "no DKIM configured"), not a failure. A
+  // stricter `status === 0` check here would exclude NXDOMAIN and make this
+  // finding nearly unreachable, since a domain with zero DKIM setup returns
+  // NXDOMAIN for every one of the ~34 selectors tried. Only an actual
+  // network/timeout failure (-1) across every selector means "no basis".
   const anyQuerySucceeded = results.some(
-    (r) => r.status === "fulfilled" && r.value.status === 0,
+    (r) => r.status === "fulfilled" && r.value.status !== -1,
   );
 
   if (!foundAny && anyQuerySucceeded) {

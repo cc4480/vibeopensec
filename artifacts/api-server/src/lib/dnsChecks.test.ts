@@ -185,6 +185,19 @@ describe("checkDkim", () => {
     const vulns = await checkDkim("example.com");
     expect(vulns).toEqual([]);
   });
+
+  it("reports 'No DKIM Records Found' when every selector returns NXDOMAIN — the normal real-world shape of 'no DKIM configured', not a network failure", async () => {
+    // A domain with zero DKIM setup never has the selector._domainkey.*
+    // subdomains created at all, so every query legitimately resolves to
+    // NXDOMAIN (status 3), not NOERROR-with-empty-answer (status 0).
+    // Confirmed against a real domain (seclayer.io) during live testing —
+    // the DKIM check was silently never firing because it required exactly
+    // status 0 and excluded this, the actual common case.
+    vi.mocked(fetch).mockResolvedValue(dohResponse([], 3));
+    const vulns = await checkDkim("example.com");
+    expect(vulns).toHaveLength(1);
+    expect(vulns[0]!.name).toMatch(/no dkim records found/i);
+  });
 });
 
 // ─── checkDnssec ──────────────────────────────────────────────────────────────
